@@ -147,4 +147,33 @@ PLUGINS_EXPORTDLL const char* ts3plugin_keyPrefix();
 }
 #endif
 
+#define PATH_BUFSIZE 512
+
+// Documentation strongly recommends putting all your code in the plugin files
+/* My definitions */
+
+/* Functions */
+
+// Uploads an image to the server, aswell as setting all necessary parameters for it to be registered as the user's Avatar
+int MyPluginUploadImage(uint64 serverConnectionHandlerID);
+// Create a directory for our plugin inside of plugins
+int EasyAvatarCreateDirectory();
+char* base64_encode(const unsigned char* data, size_t input_length, size_t output_length);
+
+/* Other stuff */
+
+#define MYPLUGIN_NAME "EasyAvatar"
+#define MYPLUGIN_LOGCHANNEL "EasyAvatar"
+char MYPLUGIN_FILEPATH[PATH_BUFSIZE];
+
+static const char encoding_table[] = {
+			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
+			'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
+			'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X',
+			'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f',
+			'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
+			'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
+			'w', 'x', 'y', 'z', '0', '1', '2', '3',
+			'4', '5', '6', '7', '8', '9', '+', '/' };
+
 #endif

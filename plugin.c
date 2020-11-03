@@ -21,13 +21,6 @@
 #include "ts3_functions.h"
 #include "plugin.h"
 
-/* My definitions */
-
-/* Functions */
-int MyPluginUploadImage(uint64 serverConnectionHandlerID);
-/* Other stuff */
-#define MYPLUGIN_LOGCHANNEL "MyPlugin"
-#define MYPLUGIN_FILEPATH "C:\\Users\\USERNAME\\AppData\\Roaming\\TS3Client\\plugins\\MyPlugin"
 
 
 static struct TS3Functions ts3Functions;
@@ -41,7 +34,6 @@ static struct TS3Functions ts3Functions;
 
 #define PLUGIN_API_VERSION 23
 
-#define PATH_BUFSIZE 512
 #define COMMAND_BUFSIZE 128
 #define INFODATA_BUFSIZE 128
 #define SERVERINFO_BUFSIZE 256
@@ -74,14 +66,14 @@ const char* ts3plugin_name() {
 	/* TeamSpeak expects UTF-8 encoded characters. Following demonstrates a possibility how to convert UTF-16 wchar_t into UTF-8. */
 	static char* result = NULL;  /* Static variable so it's allocated only once */
 	if(!result) {
-		const wchar_t* name = L"Test Plugin";
+		const wchar_t* name = L"EasyAvatar";
 		if(wcharToUtf8(name, &result) == -1) {  /* Convert name into UTF-8 encoded result */
-			result = "Test Plugin";  /* Conversion failed, fallback here */
+			result = "EasyAvatar";  /* Conversion failed, fallback here */
 		}
 	}
 	return result;
 #else
-	return "Test Plugin";
+	return "EasyAvatar";
 #endif
 }
 
@@ -104,7 +96,7 @@ const char* ts3plugin_author() {
 /* Plugin description */
 const char* ts3plugin_description() {
 	/* If you want to use wchar_t, see ts3plugin_name() on how to use */
-	return "This plugin demonstrates the TeamSpeak 3 client plugin architecture.";
+	return "Easily set your avatar.";
 }
 
 /* Set TeamSpeak 3 callback functions */
@@ -125,6 +117,12 @@ int ts3plugin_init() {
 	/* Your plugin init code here */
 	printf("PLUGIN: init\n");
 
+	ts3Functions.logMessage("Plugin Init", LogLevel_DEBUG, MYPLUGIN_LOGCHANNEL, 0);
+
+	if (!EasyAvatarCreateDirectory())
+		return 1;
+
+	ts3Functions.logMessage("Init successfull", LogLevel_DEBUG, MYPLUGIN_LOGCHANNEL, 0);
 	/* Example on how to query application, resources and configuration paths from client */
 	/* Note: Console client returns empty string for app and resources path */
 	ts3Functions.getAppPath(appPath, PATH_BUFSIZE);
@@ -132,7 +130,9 @@ int ts3plugin_init() {
 	ts3Functions.getConfigPath(configPath, PATH_BUFSIZE);
 	ts3Functions.getPluginPath(pluginPath, PATH_BUFSIZE, pluginID);
 
-	printf("PLUGIN: App path: %s\nResources path: %s\nConfig path: %s\nPlugin path: %s\n", appPath, resourcesPath, configPath, pluginPath);
+	/*char buffer[4096];
+	snprintf(buffer, sizeof(buffer), "PLUGIN: App path: %s\nResources path: %s\nConfig path: %s\nPlugin path: %s\n", appPath, resourcesPath, configPath, pluginPath);
+	ts3Functions.logMessage(buffer, LogLevel_DEBUG, MYPLUGIN_LOGCHANNEL, 0);*/
 
 	return 0;  /* 0 = success, 1 = failure, -2 = failure but client will not show a "failed to load" warning */
 	/* -2 is a very special case and should only be used if a plugin displays a dialog (e.g. overlay) asking the user to disable
@@ -194,7 +194,7 @@ void ts3plugin_registerPluginID(const char* id) {
 
 /* Plugin command keyword. Return NULL or "" if not used. */
 const char* ts3plugin_commandKeyword() {
-	return "test";
+	return "";
 }
 
 static void print_and_free_bookmarks_list(struct PluginBookmarkList* list)
@@ -1179,11 +1179,15 @@ const char* ts3plugin_keyPrefix() {
 void ts3plugin_onClientDisplayNameChanged(uint64 serverConnectionHandlerID, anyID clientID, const char* displayName, const char* uniqueClientIdentifier) {
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /* My functions */
+
 int MyPluginUploadImage(uint64 serverConnectionHandlerID)
 {
 	ts3Functions.logMessage("Called MyPluginUploadImage", LogLevel_DEBUG, MYPLUGIN_LOGCHANNEL, serverConnectionHandlerID);
 
+	// Uniquely identifies our client on the server
 	anyID myID;
 	if (ts3Functions.getClientID(serverConnectionHandlerID, &myID) != ERROR_ok)
 	{  /* Get own client ID */
@@ -1193,10 +1197,18 @@ int MyPluginUploadImage(uint64 serverConnectionHandlerID)
 
 	anyID transferID;
 	int channelID = 0;
-	const char* fileName = "avatar_MTk5NT0=";
 	const char* md5Hash = "1e0d208b1ef2760c3fdf22786328b370";
 
-	// Apparently still returns ERROR_ok even if the path is invalid
+	char clientIDHash[64];
+	snprintf(clientIDHash, sizeof(clientIDHash), "%hu=", myID);
+	size_t clientIDHashLen = strnlen_s(clientIDHash, sizeof(clientIDHash));
+	// Avatar file must be named avatar_<CLIENTIDHASH>= with CLIENTIDHASH being your clientID (notice trailing equal sign), no extension
+	char fileName[128];
+	snprintf(fileName, sizeof(fileName), "avatar_%s", base64_encode(clientIDHash, clientIDHashLen, clientIDHashLen));
+	
+
+	// Upload the image to the virtual servers internal file repository (channel with ID 0)
+	// Apparently still returns ERROR_ok even if the path to the image is invalid
 	if (ts3Functions.sendFile(serverConnectionHandlerID, channelID, "", fileName, 1, 0, MYPLUGIN_FILEPATH, &transferID, NULL) != ERROR_ok)
 	{
 		ts3Functions.logMessage("Failed to upload file.", LogLevel_ERROR, MYPLUGIN_LOGCHANNEL, serverConnectionHandlerID);
@@ -1204,16 +1216,17 @@ int MyPluginUploadImage(uint64 serverConnectionHandlerID)
 	}
 
 	char msg[1024];
-	snprintf(msg, sizeof(msg), "Successfully uploaded file. Transfer ID: %hu ; ClientID: %hu", transferID, myID);
+	snprintf(msg, sizeof(msg), "Successfully uploaded file. Transfer ID: %hu ; ClientID: %hu; clientIDHash: %s", transferID, myID, clientIDHash);
 	ts3Functions.logMessage(msg, LogLevel_DEBUG, MYPLUGIN_LOGCHANNEL, serverConnectionHandlerID);
 
+	// Set the CLIENT_FLAG_AVATAR attribute of our client to the md5 hash of the image file
 	if (ts3Functions.setClientSelfVariableAsString(serverConnectionHandlerID, CLIENT_FLAG_AVATAR, md5Hash) != ERROR_ok)
 	{
 		ts3Functions.logMessage("Failed to set CLIENT_FLAG_AVATAR", LogLevel_ERROR, MYPLUGIN_LOGCHANNEL, serverConnectionHandlerID);
 		return 0;
 	}
 
-	// Flush all changes
+	// Flush all changes to the server
 	if (ts3Functions.flushClientSelfUpdates(serverConnectionHandlerID, NULL) != ERROR_ok)
 	{
 		ts3Functions.logMessage("Failed to flush changes", LogLevel_ERROR, MYPLUGIN_LOGCHANNEL, serverConnectionHandlerID);
@@ -1222,5 +1235,81 @@ int MyPluginUploadImage(uint64 serverConnectionHandlerID)
 
 	ts3Functions.logMessage("Set avatar successfully!", LogLevel_INFO, MYPLUGIN_LOGCHANNEL, serverConnectionHandlerID);
 
+	// Return true if everything worked as expected
 	return 1;
 }
+
+// If anything in this function fails, the plugin will be unloaded
+int EasyAvatarCreateDirectory()
+{
+	char currentDirectory[PATH_BUFSIZE];
+	char pluginDirectory[PATH_BUFSIZE];
+
+	// One of the few ts3Functions that doesn't return an error code...
+	ts3Functions.getPluginPath(currentDirectory, PATH_BUFSIZE, pluginID);
+	
+	// Construct the path for our plugin's directory and then create the directory
+	snprintf(pluginDirectory, sizeof(pluginDirectory), "%s\\easy_avatar", currentDirectory);
+	if (!CreateDirectoryA(pluginDirectory, NULL))
+	{
+		// CreateDirectory can fails if the directory already exists, check last error
+		if (GetLastError() != ERROR_ALREADY_EXISTS)
+		{
+			// CreateDirectory failed for another reason, abort
+			ts3Functions.logMessage("Failed to create plugin directory!", LogLevel_ERROR, MYPLUGIN_LOGCHANNEL, 0);
+			return 0;
+		}
+		else
+		{
+			ts3Functions.logMessage("Plugin directory already exists", LogLevel_DEBUG, MYPLUGIN_LOGCHANNEL, 0);
+		}
+	}
+	else
+	{
+		ts3Functions.logMessage("Successfully created plugin directory", LogLevel_INFO, MYPLUGIN_LOGCHANNEL, 0);
+	}
+
+	// Copy the path to the directory we just created into a global buffer
+	_strcpy(MYPLUGIN_FILEPATH, PATH_BUFSIZE, pluginDirectory);
+
+	return 1;
+}
+
+// Taken from https://stackoverflow.com/a/48818578
+char* base64_encode(const unsigned char* data, size_t input_length, size_t output_length) 
+{
+	const int mod_table[] = { 0, 2, 1 };
+
+	output_length = 4 * ((input_length + 2) / 3);
+
+	// One extra character for correct null termination
+	char* encoded_data = (char*)malloc(output_length + 1);
+
+	if (encoded_data == NULL)
+		return NULL;
+
+	for (int i = 0, j = 0; i < input_length;) 
+	{
+		unsigned int octet_a = i < input_length ? (unsigned char)data[i++] : 0;
+		unsigned int octet_b = i < input_length ? (unsigned char)data[i++] : 0;
+		unsigned int octet_c = i < input_length ? (unsigned char)data[i++] : 0;
+
+		unsigned int triple = (octet_a << 0x10) + (octet_b << 0x08) + octet_c;
+
+		encoded_data[j++] = encoding_table[(triple >> 3 * 6) & 0x3F];
+		encoded_data[j++] = encoding_table[(triple >> 2 * 6) & 0x3F];
+		encoded_data[j++] = encoding_table[(triple >> 1 * 6) & 0x3F];
+		encoded_data[j++] = encoding_table[(triple >> 0 * 6) & 0x3F];
+
+	}
+
+	for (int i = 0; i < mod_table[input_length % 3]; i++)
+		encoded_data[output_length - 1 - i] = '=';
+
+	// Null terminate
+	encoded_data[output_length] = 0;
+	
+
+	return encoded_data;
+
+};
