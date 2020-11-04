@@ -154,16 +154,36 @@ PLUGINS_EXPORTDLL const char* ts3plugin_keyPrefix();
 
 /* Functions */
 
-// Uploads an image to the server, aswell as setting all necessary parameters for it to be registered as the user's Avatar
-int MyPluginUploadImage(uint64 serverConnectionHandlerID);
-// Create a directory for our plugin inside of plugins
-int EasyAvatarCreateDirectory();
-char* base64_encode(const unsigned char* data, size_t input_length, size_t output_length);
+/*
+	Uploads an image to the server, aswell as setting all necessary parameters for it to be registered as the user's Avatar
+*/
+int EasyAvatar_UploadImage(uint64 serverConnectionHandlerID);
+
+/*
+	Create a directory for our plugin inside of plugins
+*/
+int EasyAvatar_CreateDirectory();
+
+char* EasyAvatar_b64encode(const unsigned char* data, size_t input_length, size_t output_length);
+
+/*	
+	Retrieve the data stored in the user's clipboard, return a heap allocated string. 
+	Returns NULL if anything fails
+*/
+char* EasyAvatar_GetLinkFromClipboard(uint64 serverConnectionHandlerID);
+
+/*
+	Returns a MD5 Hash of the given file on disk
+*/
+char* EasyAvatar_CreateMD5Hash(const char* filePath, uint64 serverConnectionHandlerID);
+
 
 /* Other stuff */
 
 #define MYPLUGIN_NAME "EasyAvatar"
 #define MYPLUGIN_LOGCHANNEL "EasyAvatar"
+#define BUFSIZE 1024
+#define MD5LEN  16
 char MYPLUGIN_FILEPATH[PATH_BUFSIZE];
 
 static const char encoding_table[] = {

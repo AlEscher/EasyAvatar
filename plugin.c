@@ -1,7 +1,7 @@
 /*
  * TeamSpeak 3 demo plugin
  *
- * Copyright (c) 2008-2017 TeamSpeak Systems GmbH
+ * Copyright (c) TeamSpeak Systems GmbH
  */
 
 #ifdef _WIN32
@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <Wincrypt.h>
 #include "teamspeak/public_errors.h"
 #include "teamspeak/public_errors_rare.h"
 #include "teamspeak/public_definitions.h"
@@ -119,7 +120,7 @@ int ts3plugin_init() {
 
 	ts3Functions.logMessage("Plugin Init", LogLevel_DEBUG, MYPLUGIN_LOGCHANNEL, 0);
 
-	if (!EasyAvatarCreateDirectory())
+	if (!EasyAvatar_CreateDirectory())
 		return 1;
 
 	ts3Functions.logMessage("Init successfull", LogLevel_DEBUG, MYPLUGIN_LOGCHANNEL, 0);
@@ -1134,7 +1135,7 @@ void ts3plugin_onMenuItemEvent(uint64 serverConnectionHandlerID, enum PluginMenu
 			switch(menuItemID) {
 				case MENU_ID_CLIENT_1:
 					/* Menu client 1 was triggered */
-					MyPluginUploadImage(serverConnectionHandlerID);
+					EasyAvatar_UploadImage(serverConnectionHandlerID);
 					break;
 				case MENU_ID_CLIENT_2:
 					/* Menu client 2 was triggered */
@@ -1183,7 +1184,7 @@ void ts3plugin_onClientDisplayNameChanged(uint64 serverConnectionHandlerID, anyI
 
 /* My functions */
 
-int MyPluginUploadImage(uint64 serverConnectionHandlerID)
+int EasyAvatar_UploadImage(uint64 serverConnectionHandlerID)
 {
 	ts3Functions.logMessage("Called MyPluginUploadImage", LogLevel_DEBUG, MYPLUGIN_LOGCHANNEL, serverConnectionHandlerID);
 
@@ -1197,31 +1198,53 @@ int MyPluginUploadImage(uint64 serverConnectionHandlerID)
 
 	anyID transferID;
 	int channelID = 0;
-	const char* md5Hash = "1e0d208b1ef2760c3fdf22786328b370";
+	// Avatar file must be named avatar_ followed by the base64 hash of "CLIENTID=" (note trailing '=') with CLIENTID being your clientID on the server, no extension
+	char* clientIDHash = NULL;
+	char* md5Hash = NULL;
 
-	char clientIDHash[64];
-	snprintf(clientIDHash, sizeof(clientIDHash), "%hu=", myID);
-	size_t clientIDHashLen = strnlen_s(clientIDHash, sizeof(clientIDHash));
-	// Avatar file must be named avatar_<CLIENTIDHASH>= with CLIENTIDHASH being your clientID (notice trailing equal sign), no extension
+	// Client ID as a string to be passed to the base64 encode function
+	char clientID[64];
+	// Add trailing '=' to clientID
+	snprintf(clientID, sizeof(clientID), "%hu=", myID);
+	size_t clientIDHashLen = strnlen_s(clientID, sizeof(clientID));
+
+	clientIDHash = EasyAvatar_b64encode(clientID, clientIDHashLen, clientIDHashLen);
+	if (!clientIDHash)
+	{
+		ts3Functions.logMessage("Failed to create base64 hash of clientID", LogLevel_ERROR, MYPLUGIN_LOGCHANNEL, serverConnectionHandlerID);
+		return 0;
+	}
+
+	// Currently just takes the file path for testing purposes
+	md5Hash = EasyAvatar_CreateMD5Hash("", serverConnectionHandlerID);
+	if (!md5Hash)
+	{
+		ts3Functions.logMessage("Failed to create MD5 hash of file contents", LogLevel_ERROR, MYPLUGIN_LOGCHANNEL, serverConnectionHandlerID);
+		ts3Functions.freeMemory(clientIDHash);
+		return 0;
+	}
+
 	char fileName[128];
-	snprintf(fileName, sizeof(fileName), "avatar_%s", base64_encode(clientIDHash, clientIDHashLen, clientIDHashLen));
+	snprintf(fileName, sizeof(fileName), "avatar_%s", clientIDHash);
 	
 
 	// Upload the image to the virtual servers internal file repository (channel with ID 0)
 	// Apparently still returns ERROR_ok even if the path to the image is invalid
-	if (ts3Functions.sendFile(serverConnectionHandlerID, channelID, "", fileName, 1, 0, MYPLUGIN_FILEPATH, &transferID, NULL) != ERROR_ok)
+	if (ts3Functions.sendFile(serverConnectionHandlerID, channelID, "", "avatar_MjAyNz0=", 1, 0, MYPLUGIN_FILEPATH, &transferID, NULL) != ERROR_ok)
 	{
 		ts3Functions.logMessage("Failed to upload file.", LogLevel_ERROR, MYPLUGIN_LOGCHANNEL, serverConnectionHandlerID);
 		return 0;
 	}
 
 	char msg[1024];
-	snprintf(msg, sizeof(msg), "Successfully uploaded file. Transfer ID: %hu ; ClientID: %hu; clientIDHash: %s", transferID, myID, clientIDHash);
+	snprintf(msg, sizeof(msg), "Successfully uploaded file. Transfer ID: %hu ; ClientID: %hu; clientIDHash: %s, MD5Hash: %s", transferID, myID, clientIDHash, md5Hash);
 	ts3Functions.logMessage(msg, LogLevel_DEBUG, MYPLUGIN_LOGCHANNEL, serverConnectionHandlerID);
 
 	// Set the CLIENT_FLAG_AVATAR attribute of our client to the md5 hash of the image file
 	if (ts3Functions.setClientSelfVariableAsString(serverConnectionHandlerID, CLIENT_FLAG_AVATAR, md5Hash) != ERROR_ok)
 	{
+		ts3Functions.freeMemory(clientIDHash);
+		ts3Functions.freeMemory(md5Hash);
 		ts3Functions.logMessage("Failed to set CLIENT_FLAG_AVATAR", LogLevel_ERROR, MYPLUGIN_LOGCHANNEL, serverConnectionHandlerID);
 		return 0;
 	}
@@ -1229,10 +1252,14 @@ int MyPluginUploadImage(uint64 serverConnectionHandlerID)
 	// Flush all changes to the server
 	if (ts3Functions.flushClientSelfUpdates(serverConnectionHandlerID, NULL) != ERROR_ok)
 	{
+		ts3Functions.freeMemory(clientIDHash);
+		ts3Functions.freeMemory(md5Hash);
 		ts3Functions.logMessage("Failed to flush changes", LogLevel_ERROR, MYPLUGIN_LOGCHANNEL, serverConnectionHandlerID);
 		return 0;
 	}
 
+	ts3Functions.freeMemory(clientIDHash);
+	ts3Functions.freeMemory(md5Hash);
 	ts3Functions.logMessage("Set avatar successfully!", LogLevel_INFO, MYPLUGIN_LOGCHANNEL, serverConnectionHandlerID);
 
 	// Return true if everything worked as expected
@@ -1240,7 +1267,7 @@ int MyPluginUploadImage(uint64 serverConnectionHandlerID)
 }
 
 // If anything in this function fails, the plugin will be unloaded
-int EasyAvatarCreateDirectory()
+int EasyAvatar_CreateDirectory()
 {
 	char currentDirectory[PATH_BUFSIZE];
 	char pluginDirectory[PATH_BUFSIZE];
@@ -1252,7 +1279,7 @@ int EasyAvatarCreateDirectory()
 	snprintf(pluginDirectory, sizeof(pluginDirectory), "%s\\easy_avatar", currentDirectory);
 	if (!CreateDirectoryA(pluginDirectory, NULL))
 	{
-		// CreateDirectory can fails if the directory already exists, check last error
+		// CreateDirectory can fail if the directory already exists, check last error
 		if (GetLastError() != ERROR_ALREADY_EXISTS)
 		{
 			// CreateDirectory failed for another reason, abort
@@ -1261,7 +1288,7 @@ int EasyAvatarCreateDirectory()
 		}
 		else
 		{
-			ts3Functions.logMessage("Plugin directory already exists", LogLevel_DEBUG, MYPLUGIN_LOGCHANNEL, 0);
+			ts3Functions.logMessage("Plugin directory already exists", LogLevel_INFO, MYPLUGIN_LOGCHANNEL, 0);
 		}
 	}
 	else
@@ -1275,8 +1302,53 @@ int EasyAvatarCreateDirectory()
 	return 1;
 }
 
+char* EasyAvatar_GetLinkFromClipboard(uint64 serverConnectionHandlerID)
+{
+	// Request ownership of the clipboard
+	if (!OpenClipboard(NULL))
+		return NULL;
+
+	// Allocate a global memory object for the text. +1 for null termination
+	HGLOBAL hGlobalMem = GetClipboardData(CF_TEXT);
+	const char* clipboardStr = (const char*)(GlobalLock(hGlobalMem));
+	size_t clipBoardDataLength = strnlen_s(clipboardStr, 2048);
+	// Check that the clipboard wasn't empty
+	if (!hGlobalMem || !clipboardStr || !clipBoardDataLength)
+	{
+		ts3Functions.logMessage("Failed to get Clipboard contents.", LogLevel_ERROR, MYPLUGIN_LOGCHANNEL, serverConnectionHandlerID);
+		GlobalUnlock(hGlobalMem);
+		CloseClipboard();
+		return NULL;
+	}
+
+	// Copy content into a heap allocated buffer
+	char* clipBoardContent = (char*)malloc(clipBoardDataLength * sizeof(char));
+	if (!clipBoardContent)
+	{
+		GlobalUnlock(hGlobalMem);
+		CloseClipboard();
+		return NULL;
+	}
+
+	errno_t retValue = _strcpy(clipBoardContent, clipBoardDataLength * sizeof(char), clipboardStr);
+
+	// Unlock GlobalMem handle, according to Documentation don't free it
+	GlobalUnlock(hGlobalMem);
+	CloseClipboard();
+
+	if (retValue != 0)
+	{
+		free(clipBoardContent);
+		return NULL;
+	}
+	else
+	{
+		return clipBoardContent;
+	}
+}
+
 // Taken from https://stackoverflow.com/a/48818578
-char* base64_encode(const unsigned char* data, size_t input_length, size_t output_length) 
+char* EasyAvatar_b64encode(const unsigned char* data, size_t input_length, size_t output_length)
 {
 	const int mod_table[] = { 0, 2, 1 };
 
@@ -1311,5 +1383,107 @@ char* base64_encode(const unsigned char* data, size_t input_length, size_t outpu
 	
 
 	return encoded_data;
-
 };
+
+// As specified by https://docs.microsoft.com/en-us/windows/win32/seccrypto/example-c-program--creating-an-md-5-hash-from-file-content
+char* EasyAvatar_CreateMD5Hash(const char* filePath, uint64 serverConnectionHandlerID)
+{
+	DWORD dwStatus = 0;
+	BOOL bResult = FALSE;
+	HCRYPTPROV hProv = 0;
+	HCRYPTHASH hHash = 0;
+	HANDLE hFile = NULL;
+	BYTE rgbFile[BUFSIZE];
+	DWORD cbRead = 0;
+	BYTE rgbHash[MD5LEN];
+	DWORD cbHash = 0;
+	CHAR rgbDigits[] = "0123456789abcdef";
+
+	hFile = CreateFileA(filePath,
+		GENERIC_READ,
+		FILE_SHARE_READ,
+		NULL,
+		OPEN_EXISTING,
+		FILE_FLAG_SEQUENTIAL_SCAN,
+		NULL);
+
+	if (INVALID_HANDLE_VALUE == hFile)
+	{
+		char errorMessage[1024];
+		snprintf(errorMessage, sizeof(errorMessage), "Error openen file for hashing: Filepath: %s  Error Code: %d", filePath, GetLastError());
+		ts3Functions.logMessage(errorMessage, LogLevel_ERROR, MYPLUGIN_LOGCHANNEL, serverConnectionHandlerID);
+		return NULL;
+	}
+
+	// Get handle to the crypto provider
+	if (!CryptAcquireContextA(&hProv, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT))
+	{
+		CloseHandle(hFile);
+		return NULL;
+	}
+
+	if (!CryptCreateHash(hProv, CALG_MD5, 0, 0, &hHash))
+	{
+		CloseHandle(hFile);
+		CryptReleaseContext(hProv, 0);
+		return NULL;
+	}
+
+	while (bResult = ReadFile(hFile, rgbFile, BUFSIZE, &cbRead, NULL))
+	{
+		if (0 == cbRead)
+		{
+			break;
+		}
+
+		if (!CryptHashData(hHash, rgbFile, cbRead, 0))
+		{
+			CryptReleaseContext(hProv, 0);
+			CryptDestroyHash(hHash);
+			CloseHandle(hFile);
+			return NULL;
+		}
+	}
+
+	if (!bResult)
+	{
+		CryptReleaseContext(hProv, 0);
+		CryptDestroyHash(hHash);
+		CloseHandle(hFile);
+		return NULL;
+	}
+
+	cbHash = MD5LEN;
+	char* imageMD5Hash = NULL;
+	if (CryptGetHashParam(hHash, HP_HASHVAL, rgbHash, &cbHash, 0))
+	{
+		// +1 for Null termination
+		imageMD5Hash = (char*)malloc((unsigned long long)cbHash * 2 * sizeof(char) + 1);
+		if (!imageMD5Hash)
+		{
+			CryptDestroyHash(hHash);
+			CryptReleaseContext(hProv, 0);
+			CloseHandle(hFile);
+			return NULL;
+		}
+
+		// Create our hash
+		for (DWORD i = 0; i < cbHash; i++)
+		{
+			imageMD5Hash[i * 2] = rgbDigits[rgbHash[i] >> 4];
+			imageMD5Hash[i * 2 + 1] = rgbDigits[rgbHash[i] & 0xf];
+		}
+		// Null terminate
+		imageMD5Hash[cbHash * 2 + 1] = 0;
+	}
+	else
+	{
+		// Nothing todo, imageMD5Hash will be NULL which will be handled by caller
+	}
+
+	CryptDestroyHash(hHash);
+	CryptReleaseContext(hProv, 0);
+	CloseHandle(hFile);
+
+	return imageMD5Hash;
+}
