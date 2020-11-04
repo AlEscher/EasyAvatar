@@ -1,0 +1,27 @@
+# EasyAvatar
+
+A TeamSpeak 3 plugin written in C.  
+With this plugin you can easily set your avatar to any image from a URL.
+
+## Usage
+
+### Installation
+
+1. Press ⊞ Win + R
+2. Type %appdata% and press Enter
+3. In the folder that opens, navigate to "TS3Client" -> "plugins"
+4. Copy EasyAvatar.dll into the folder
+5. Start TeamSpeak 3
+6. In TeamSpeak, if you click on Extras -> Options -> Addons you should see "EasyAvatar" under Plugins
+
+### Context menu
+
+Simply copy any URL of an image (ending with e.g. ".jpg").  
+When connected to a server, Right Click on yourself and at the bottom under "EasyAvatar" click "Set Image"
+
+### Hotkey
+
+You can bind the Setting of your Avatar to a Hot-Key.  
+To do this, click on Extras -> Options -> Hotkeys and press "Add".  
+Click on "Show advanced options", find and open up "Plugins" -> "Plugin Hotkey" -> "EasyAvatar" -> "Set Avatar" and then set a Hotkey.  
+Once you have the Hotkey set up, simply copy any URL of an image (ending with e.g. ".jpg") and press the Hotkey.
