@@ -9,14 +9,14 @@
 #include <Windows.h>
 #endif
 
+#pragma comment(lib, "Urlmon.lib")
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 #include <Wincrypt.h>
-// Installed using vcpkg
-#define CURL_STATICLIB
-#include <curl/curl.h>
+#include <urlmon.h>
 #include "teamspeak/public_errors.h"
 #include "teamspeak/public_errors_rare.h"
 #include "teamspeak/public_definitions.h"
@@ -125,15 +125,6 @@ int ts3plugin_init() {
 	if (!EasyAvatar_CreateDirectory())
 		return 1;
 
-	CURLcode res = curl_global_init(CURL_GLOBAL_ALL);
-	if (res != 0)
-	{
-		char buf[256];
-		snprintf(buf, sizeof(buf), "Failed to initialize Curl: %s", curl_easy_strerror(res));
-		ts3Functions.logMessage(buf, LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, 0);
-		return 1;
-	}
-
 	ts3Functions.logMessage("Init successfull", LogLevel_DEBUG, EASYAVATAR_LOGCHANNEL, 0);
 	/* Example on how to query application, resources and configuration paths from client */
 	/* Note: Console client returns empty string for app and resources path */
@@ -156,7 +147,6 @@ int ts3plugin_init() {
 void ts3plugin_shutdown() {
 	/* Your plugin cleanup code here */
 	
-	curl_global_cleanup();
 
 	/*
 	 * Note:
@@ -1019,20 +1009,11 @@ int EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID)
 {
 	ts3Functions.logMessage("Called EasyAvatar_SetAvatar", LogLevel_DEBUG, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
 
-	CURL* curl;
-	curl = curl_easy_init();
-	if (!curl)
-	{
-		ts3Functions.logMessage("Error creating Curl object", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
-		return 0;
-	}
-
 	// Uniquely identifies our client on the server
 	anyID myID;
 	if (ts3Functions.getClientID(serverConnectionHandlerID, &myID) != ERROR_ok)
 	{
 		ts3Functions.logMessage("Error querying own client id", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
-		curl_easy_cleanup(curl);
 		return 0;
 	}
 
@@ -1052,7 +1033,6 @@ int EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID)
 	if (!clientIDHash)
 	{
 		ts3Functions.logMessage("Failed to create base64 hash of clientID", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
-		curl_easy_cleanup(curl);
 		return 0;
 	}
 
@@ -1060,59 +1040,40 @@ int EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID)
 	snprintf(fileName, sizeof(fileName), "avatar_%s", clientIDHash);
 
 	// Get image from URL
-	char* imageURL = EasyAvatar_GetLinkFromClipboard(serverConnectionHandlerID);
+	char* imageURL = "hi"/*EasyAvatar_GetLinkFromClipboard(serverConnectionHandlerID)*/;
 	if (!imageURL)
 	{
 		ts3Functions.logMessage("Failed to get Image URL from Clipboard", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
 		ts3Functions.freeMemory(clientIDHash);
-		curl_easy_cleanup(curl);
-	}
-
-	struct FileOut file;
-	file.filename = fileName;
-	file.stream = NULL;
-
-	// https://github.com/curl/curl/blob/master/docs/examples/getinmemory.c
-	curl_easy_setopt(curl, CURLOPT_URL, imageURL);
-	// Define our callback to get called when there's data to be written
-	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, EasyAvatar_WriteFile);
-	// Set a pointer to our struct that gets passed to the callback
-	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &file);
-	// Some servers don't like requests that are made without a user-agent field, so we provide one
-	curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcurl-agent/1.0");
-
-	CURLcode res = curl_easy_perform(curl);
-	if (res != CURLE_OK)
-	{
-		char buf[1024];
-		snprintf(buf, sizeof(buf), "Failed to download from: %s", imageURL);
-		ts3Functions.logMessage(buf, LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
-		ts3Functions.freeMemory(clientIDHash);
-		ts3Functions.freeMemory(imageURL);
-		curl_easy_cleanup(curl);
-
-		// File may not have been closed correctly by our Callback
-		if (file.stream)
-			fclose(file.stream);
-
 		return 0;
 	}
-	else
+	imageURL = NULL;
+
+	/*char buf[256];
+	snprintf(buf, sizeof(buf), "URL: %s", imageURL);
+	ts3Functions.logMessage(buf, LogLevel_DEBUG, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);*/
+
+	// Absolute file path to our image file
+	char filePath[PATH_BUFSIZE];
+	snprintf(filePath, sizeof(filePath), "%s\\%s", EASYAVATAR_FILEPATH, fileName);
+
+	// TODO: Should take result of GetLinkFromClipboard, but doesn't currently work
+	HRESULT res = URLDownloadToFileA(NULL, "https://avatars1.githubusercontent.com/u/50444010?s=60&u=af6edddb8ec9f7cab2875d36ca729eb1d5b92c2c&v=4", filePath, 0, NULL);
+	if (res != S_OK)
 	{
-		// Our EasyAvatar_WriteFile successfully wrote the file to disk with the correct name "avatar_::"
+		ts3Functions.logMessage("Download of image failed", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
+		ts3Functions.freeMemory(imageURL);
+		ts3Functions.freeMemory(clientIDHash);
+		return 0;
 	}
 
 	ts3Functions.freeMemory(imageURL);
 
-	char filePath[PATH_BUFSIZE];
-	snprintf(filePath, sizeof(filePath), "%s\\%s", EASYAVATAR_FILEPATH, fileName);
-	// Currently just takes the file path for testing purposes
 	md5Hash = EasyAvatar_CreateMD5Hash(filePath, serverConnectionHandlerID);
 	if (!md5Hash)
 	{
 		ts3Functions.logMessage("Failed to create MD5 hash of file contents", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
 		ts3Functions.freeMemory(clientIDHash);
-		curl_easy_cleanup(curl);
 		return 0;
 	}
 
@@ -1123,7 +1084,6 @@ int EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID)
 		ts3Functions.logMessage("Failed to upload file.", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
 		ts3Functions.freeMemory(clientIDHash);
 		ts3Functions.freeMemory(md5Hash);
-		curl_easy_cleanup(curl);
 		return 0;
 	}
 
@@ -1131,13 +1091,12 @@ int EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID)
 	snprintf(msg, sizeof(msg), "Successfully uploaded file. Transfer ID: %hu ; ClientID: %hu; clientIDHash: %s, MD5Hash: %s", transferID, myID, clientIDHash, md5Hash);
 	ts3Functions.logMessage(msg, LogLevel_DEBUG, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
 
-	// Set the CLIENT_FLAG_AVATAR attribute of our client to the md5 hash of the image file
+	// Set the CLIENT_FLAG_AVATAR attribute of our client to the md5 hash of the image file in order to register it as our Avatar
 	if (ts3Functions.setClientSelfVariableAsString(serverConnectionHandlerID, CLIENT_FLAG_AVATAR, md5Hash) != ERROR_ok)
 	{
 		ts3Functions.logMessage("Failed to set CLIENT_FLAG_AVATAR", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
 		ts3Functions.freeMemory(clientIDHash);
 		ts3Functions.freeMemory(md5Hash);
-		curl_easy_cleanup(curl);
 		return 0;
 	}
 
@@ -1147,11 +1106,9 @@ int EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID)
 		ts3Functions.logMessage("Failed to flush changes", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
 		ts3Functions.freeMemory(clientIDHash);
 		ts3Functions.freeMemory(md5Hash);
-		curl_easy_cleanup(curl);
 		return 0;
 	}
 
-	curl_easy_cleanup(curl);
 	ts3Functions.freeMemory(clientIDHash);
 	ts3Functions.freeMemory(md5Hash);
 	ts3Functions.logMessage("Avatar set successfully!", LogLevel_INFO, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
@@ -1370,7 +1327,7 @@ char* EasyAvatar_CreateMD5Hash(const char* filePath, uint64 serverConnectionHand
 			imageMD5Hash[i * 2 + 1] = rgbDigits[rgbHash[i] & 0xf];
 		}
 		// Null terminate
-		imageMD5Hash[cbHash * 2 + 1] = 0;
+		imageMD5Hash[cbHash * 2] = 0;
 	}
 	else
 	{
@@ -1382,23 +1339,4 @@ char* EasyAvatar_CreateMD5Hash(const char* filePath, uint64 serverConnectionHand
 	CloseHandle(hFile);
 
 	return imageMD5Hash;
-}
-
-size_t EasyAvatar_WriteFile(void* buffer, size_t size, size_t nmemb, void* stream)
-{
-	struct FileOut* out = (struct FileOut*)stream;
-
-	if (out && !out->stream) 
-	{
-		char filePath[PATH_BUFSIZE];
-		snprintf(filePath, sizeof(filePath), "%s\\%s", EASYAVATAR_FILEPATH, out->filename);
-		if (fopen_s(&out->stream, filePath, "wb") != 0)
-			return -1;
-
-		size_t res = fwrite(buffer, size, nmemb, out->stream);
-		fclose(out->stream);
-		return res;
-	}
-	
-	return -1;
 }

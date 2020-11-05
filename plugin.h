@@ -177,11 +177,6 @@ char* EasyAvatar_GetLinkFromClipboard(uint64 serverConnectionHandlerID);
 */
 char* EasyAvatar_CreateMD5Hash(const char* filePath, uint64 serverConnectionHandlerID);
 
-/*
-	Callback function for Curl. Downloads an image and writes it to a file according to our specifications
-*/
-size_t EasyAvatar_WriteFile(void* buffer, size_t size, size_t nmemb, void* stream);
-
 
 /* Other stuff */
 
@@ -201,11 +196,5 @@ static const char encoding_table[] = {
 			'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
 			'w', 'x', 'y', 'z', '0', '1', '2', '3',
 			'4', '5', '6', '7', '8', '9', '+', '/' };
-
-struct FileOut
-{
-	const char* filename;
-	FILE* stream;
-};
 
 #endif
