@@ -14,6 +14,9 @@
 #include <string.h>
 #include <assert.h>
 #include <Wincrypt.h>
+// Installed using vcpkg
+#define CURL_STATICLIB
+#include <curl/curl.h>
 #include "teamspeak/public_errors.h"
 #include "teamspeak/public_errors_rare.h"
 #include "teamspeak/public_definitions.h"
@@ -97,7 +100,7 @@ const char* ts3plugin_author() {
 /* Plugin description */
 const char* ts3plugin_description() {
 	/* If you want to use wchar_t, see ts3plugin_name() on how to use */
-	return "Easily set your avatar.";
+	return "Easily set your avatar from an URL.";
 }
 
 /* Set TeamSpeak 3 callback functions */
@@ -116,14 +119,22 @@ int ts3plugin_init() {
 	char pluginPath[PATH_BUFSIZE];
 
 	/* Your plugin init code here */
-	printf("PLUGIN: init\n");
 
-	ts3Functions.logMessage("Plugin Init", LogLevel_DEBUG, MYPLUGIN_LOGCHANNEL, 0);
+	ts3Functions.logMessage("Plugin Init", LogLevel_DEBUG, EASYAVATAR_LOGCHANNEL, 0);
 
 	if (!EasyAvatar_CreateDirectory())
 		return 1;
 
-	ts3Functions.logMessage("Init successfull", LogLevel_DEBUG, MYPLUGIN_LOGCHANNEL, 0);
+	CURLcode res = curl_global_init(CURL_GLOBAL_ALL);
+	if (res != 0)
+	{
+		char buf[256];
+		snprintf(buf, sizeof(buf), "Failed to initialize Curl: %s", curl_easy_strerror(res));
+		ts3Functions.logMessage(buf, LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, 0);
+		return 1;
+	}
+
+	ts3Functions.logMessage("Init successfull", LogLevel_DEBUG, EASYAVATAR_LOGCHANNEL, 0);
 	/* Example on how to query application, resources and configuration paths from client */
 	/* Note: Console client returns empty string for app and resources path */
 	ts3Functions.getAppPath(appPath, PATH_BUFSIZE);
@@ -133,7 +144,7 @@ int ts3plugin_init() {
 
 	/*char buffer[4096];
 	snprintf(buffer, sizeof(buffer), "PLUGIN: App path: %s\nResources path: %s\nConfig path: %s\nPlugin path: %s\n", appPath, resourcesPath, configPath, pluginPath);
-	ts3Functions.logMessage(buffer, LogLevel_DEBUG, MYPLUGIN_LOGCHANNEL, 0);*/
+	ts3Functions.logMessage(buffer, LogLevel_DEBUG, EASYAVATAR_LOGCHANNEL, 0);*/
 
 	return 0;  /* 0 = success, 1 = failure, -2 = failure but client will not show a "failed to load" warning */
 	/* -2 is a very special case and should only be used if a plugin displays a dialog (e.g. overlay) asking the user to disable
@@ -144,7 +155,8 @@ int ts3plugin_init() {
 /* Custom code called right before the plugin is unloaded */
 void ts3plugin_shutdown() {
 	/* Your plugin cleanup code here */
-	printf("PLUGIN: shutdown\n");
+	
+	curl_global_cleanup();
 
 	/*
 	 * Note:
@@ -166,7 +178,6 @@ void ts3plugin_shutdown() {
 
 /* Tell client if plugin offers a configuration window. If this function is not implemented, it's an assumed "does not offer" (PLUGIN_OFFERS_NO_CONFIGURE). */
 int ts3plugin_offersConfigure() {
-	printf("PLUGIN: offersConfigure\n");
 	/*
 	 * Return values:
 	 * PLUGIN_OFFERS_NO_CONFIGURE         - Plugin does not implement ts3plugin_configure
@@ -178,7 +189,6 @@ int ts3plugin_offersConfigure() {
 
 /* Plugin might offer a configuration window. If ts3plugin_offersConfigure returns 0, this function does not need to be implemented. */
 void ts3plugin_configure(void* handle, void* qParentWidget) {
-	printf("PLUGIN: configure\n");
 }
 
 /*
@@ -460,7 +470,6 @@ int ts3plugin_processCommand(uint64 serverConnectionHandlerID, const char* comma
 
 /* Client changed current server connection handler */
 void ts3plugin_currentServerConnectionChanged(uint64 serverConnectionHandlerID) {
-	printf("PLUGIN: currentServerConnectionChanged %llu (%llu)\n", (long long unsigned int)serverConnectionHandlerID, (long long unsigned int)ts3Functions.getCurrentServerConnectionHandlerID());
 }
 
 /*
@@ -469,9 +478,9 @@ void ts3plugin_currentServerConnectionChanged(uint64 serverConnectionHandlerID) 
  */
 
 /* Static title shown in the left column in the info frame */
-const char* ts3plugin_infoTitle() {
-	return "Test plugin info";
-}
+//const char* ts3plugin_infoTitle() {
+//	return "Test plugin info";
+//}
 
 /*
  * Dynamic content shown in the right column in the info frame. Memory for the data string needs to be allocated in this
@@ -480,37 +489,7 @@ const char* ts3plugin_infoTitle() {
  * "data" to NULL to have the client ignore the info data.
  */
 void ts3plugin_infoData(uint64 serverConnectionHandlerID, uint64 id, enum PluginItemType type, char** data) {
-	char* name;
-
-	/* For demonstration purpose, display the name of the currently selected server, channel or client. */
-	switch(type) {
-		case PLUGIN_SERVER:
-			if(ts3Functions.getServerVariableAsString(serverConnectionHandlerID, VIRTUALSERVER_NAME, &name) != ERROR_ok) {
-				printf("Error getting virtual server name\n");
-				return;
-			}
-			break;
-		case PLUGIN_CHANNEL:
-			if(ts3Functions.getChannelVariableAsString(serverConnectionHandlerID, id, CHANNEL_NAME, &name) != ERROR_ok) {
-				printf("Error getting channel name\n");
-				return;
-			}
-			break;
-		case PLUGIN_CLIENT:
-			if(ts3Functions.getClientVariableAsString(serverConnectionHandlerID, (anyID)id, CLIENT_NICKNAME, &name) != ERROR_ok) {
-				printf("Error getting client nickname\n");
-				return;
-			}
-			break;
-		default:
-			printf("Invalid item type: %d\n", type);
-			data = NULL;  /* Ignore */
-			return;
-	}
-
-	*data = (char*)malloc(INFODATA_BUFSIZE * sizeof(char));  /* Must be allocated in the plugin! */
-	snprintf(*data, INFODATA_BUFSIZE, "The nickname is [I]\"%s\"[/I]", name);  /* bbCode is supported. HTML is not supported */
-	ts3Functions.freeMemory(name);
+	*data = NULL;
 }
 
 /* Required to release the memory for parameter "data" allocated in ts3plugin_infoData and ts3plugin_initMenus */
@@ -581,14 +560,8 @@ void ts3plugin_initMenus(struct PluginMenuItem*** menuItems, char** menuIcon) {
 	 * e.g. for "test_plugin.dll", icon "1.png" is loaded from <TeamSpeak 3 Client install dir>\plugins\test_plugin\1.png
 	 */
 
-	BEGIN_CREATE_MENUS(7);  /* IMPORTANT: Number of menu items must be correct! */
+	BEGIN_CREATE_MENUS(1);  /* IMPORTANT: Number of menu items must be correct! */
 	CREATE_MENU_ITEM(PLUGIN_MENU_TYPE_CLIENT,  MENU_ID_CLIENT_1,  "Set Image",  "1.png");
-	CREATE_MENU_ITEM(PLUGIN_MENU_TYPE_CLIENT,  MENU_ID_CLIENT_2,  "Client item 2",  "2.png");
-	CREATE_MENU_ITEM(PLUGIN_MENU_TYPE_CHANNEL, MENU_ID_CHANNEL_1, "Channel item 1", "1.png");
-	CREATE_MENU_ITEM(PLUGIN_MENU_TYPE_CHANNEL, MENU_ID_CHANNEL_2, "Channel item 2", "2.png");
-	CREATE_MENU_ITEM(PLUGIN_MENU_TYPE_CHANNEL, MENU_ID_CHANNEL_3, "Channel item 3", "3.png");
-	CREATE_MENU_ITEM(PLUGIN_MENU_TYPE_GLOBAL,  MENU_ID_GLOBAL_1,  "Global item 1",  "1.png");
-	CREATE_MENU_ITEM(PLUGIN_MENU_TYPE_GLOBAL,  MENU_ID_GLOBAL_2,  "Global item 2",  "2.png");
 	END_CREATE_MENUS;  /* Includes an assert checking if the number of menu items matched */
 
 	/*
@@ -633,10 +606,8 @@ void ts3plugin_initHotkeys(struct PluginHotkey*** hotkeys) {
 	/* Register hotkeys giving a keyword and a description.
 	 * The keyword will be later passed to ts3plugin_onHotkeyEvent to identify which hotkey was triggered.
 	 * The description is shown in the clients hotkey dialog. */
-	BEGIN_CREATE_HOTKEYS(3);  /* Create 3 hotkeys. Size must be correct for allocating memory. */
-	CREATE_HOTKEY("keyword_1", "Test hotkey 1");
-	CREATE_HOTKEY("keyword_2", "Test hotkey 2");
-	CREATE_HOTKEY("keyword_3", "Test hotkey 3");
+	BEGIN_CREATE_HOTKEYS(1);
+	CREATE_HOTKEY("ez_set_avatar", "Set Avatar");
 	END_CREATE_HOTKEYS;
 
 	/* The client will call ts3plugin_freeMemory to release all allocated memory */
@@ -651,94 +622,6 @@ void ts3plugin_initHotkeys(struct PluginHotkey*** hotkeys) {
 /* Clientlib */
 
 void ts3plugin_onConnectStatusChangeEvent(uint64 serverConnectionHandlerID, int newStatus, unsigned int errorNumber) {
-	/* Some example code following to show how to use the information query functions. */
-
-	if(newStatus == STATUS_CONNECTION_ESTABLISHED) {  /* connection established and we have client and channels available */
-		char* s;
-		char msg[1024];
-		anyID myID;
-		uint64* ids;
-		size_t i;
-		unsigned int error;
-
-		/* Print clientlib version */
-		if(ts3Functions.getClientLibVersion(&s) == ERROR_ok) {
-			printf("PLUGIN: Client lib version: %s\n", s);
-			ts3Functions.freeMemory(s);  /* Release string */
-		} else {
-			ts3Functions.logMessage("Error querying client lib version", LogLevel_ERROR, "Plugin", serverConnectionHandlerID);
-			return;
-		}
-
-		/* Write plugin name and version to log */
-		snprintf(msg, sizeof(msg), "Plugin %s, Version %s, Author: %s", ts3plugin_name(), ts3plugin_version(), ts3plugin_author());
-		ts3Functions.logMessage(msg, LogLevel_INFO, "Plugin", serverConnectionHandlerID);
-
-		/* Print virtual server name */
-		if((error = ts3Functions.getServerVariableAsString(serverConnectionHandlerID, VIRTUALSERVER_NAME, &s)) != ERROR_ok) {
-			if(error != ERROR_not_connected) {  /* Don't spam error in this case (failed to connect) */
-				ts3Functions.logMessage("Error querying server name", LogLevel_ERROR, "Plugin", serverConnectionHandlerID);
-			}
-			return;
-		}
-		printf("PLUGIN: Server name: %s\n", s);
-		ts3Functions.freeMemory(s);
-
-		/* Print virtual server welcome message */
-		if(ts3Functions.getServerVariableAsString(serverConnectionHandlerID, VIRTUALSERVER_WELCOMEMESSAGE, &s) != ERROR_ok) {
-			ts3Functions.logMessage("Error querying server welcome message", LogLevel_ERROR, "Plugin", serverConnectionHandlerID);
-			return;
-		}
-		printf("PLUGIN: Server welcome message: %s\n", s);
-		ts3Functions.freeMemory(s);  /* Release string */
-
-		/* Print own client ID and nickname on this server */
-		if(ts3Functions.getClientID(serverConnectionHandlerID, &myID) != ERROR_ok) {
-			ts3Functions.logMessage("Error querying client ID", LogLevel_ERROR, "Plugin", serverConnectionHandlerID);
-			return;
-		}
-		if(ts3Functions.getClientSelfVariableAsString(serverConnectionHandlerID, CLIENT_NICKNAME, &s) != ERROR_ok) {
-			ts3Functions.logMessage("Error querying client nickname", LogLevel_ERROR, "Plugin", serverConnectionHandlerID);
-			return;
-		}
-		printf("PLUGIN: My client ID = %d, nickname = %s\n", myID, s);
-		ts3Functions.freeMemory(s);
-
-		/* Print list of all channels on this server */
-		if(ts3Functions.getChannelList(serverConnectionHandlerID, &ids) != ERROR_ok) {
-			ts3Functions.logMessage("Error getting channel list", LogLevel_ERROR, "Plugin", serverConnectionHandlerID);
-			return;
-		}
-		printf("PLUGIN: Available channels:\n");
-		for(i=0; ids[i]; i++) {
-			/* Query channel name */
-			if(ts3Functions.getChannelVariableAsString(serverConnectionHandlerID, ids[i], CHANNEL_NAME, &s) != ERROR_ok) {
-				ts3Functions.logMessage("Error querying channel name", LogLevel_ERROR, "Plugin", serverConnectionHandlerID);
-				return;
-			}
-			printf("PLUGIN: Channel ID = %llu, name = %s\n", (long long unsigned int)ids[i], s);
-			ts3Functions.freeMemory(s);
-		}
-		ts3Functions.freeMemory(ids);  /* Release array */
-
-		/* Print list of existing server connection handlers */
-		printf("PLUGIN: Existing server connection handlers:\n");
-		if(ts3Functions.getServerConnectionHandlerList(&ids) != ERROR_ok) {
-			ts3Functions.logMessage("Error getting server list", LogLevel_ERROR, "Plugin", serverConnectionHandlerID);
-			return;
-		}
-		for(i=0; ids[i]; i++) {
-			if((error = ts3Functions.getServerVariableAsString(ids[i], VIRTUALSERVER_NAME, &s)) != ERROR_ok) {
-				if(error != ERROR_not_connected) {  /* Don't spam error in this case (failed to connect) */
-					ts3Functions.logMessage("Error querying server name", LogLevel_ERROR, "Plugin", serverConnectionHandlerID);
-				}
-				continue;
-			}
-			printf("- %llu - %s\n", (long long unsigned int)ids[i], s);
-			ts3Functions.freeMemory(s);
-		}
-		ts3Functions.freeMemory(ids);
-	}
 }
 
 void ts3plugin_onNewChannelEvent(uint64 serverConnectionHandlerID, uint64 channelID, uint64 channelParentID) {
@@ -793,7 +676,6 @@ void ts3plugin_onServerUpdatedEvent(uint64 serverConnectionHandlerID) {
 }
 
 int ts3plugin_onServerErrorEvent(uint64 serverConnectionHandlerID, const char* errorMessage, unsigned int error, const char* returnCode, const char* extraMessage) {
-	printf("PLUGIN: onServerErrorEvent %llu %s %d %s\n", (long long unsigned int)serverConnectionHandlerID, errorMessage, error, (returnCode ? returnCode : ""));
 	if(returnCode) {
 		/* A plugin could now check the returnCode with previously (when calling a function) remembered returnCodes and react accordingly */
 		/* In case of using a a plugin return code, the plugin can return:
@@ -808,44 +690,16 @@ void ts3plugin_onServerStopEvent(uint64 serverConnectionHandlerID, const char* s
 }
 
 int ts3plugin_onTextMessageEvent(uint64 serverConnectionHandlerID, anyID targetMode, anyID toID, anyID fromID, const char* fromName, const char* fromUniqueIdentifier, const char* message, int ffIgnored) {
-	printf("PLUGIN: onTextMessageEvent %llu %d %d %s %s %d\n", (long long unsigned int)serverConnectionHandlerID, targetMode, fromID, fromName, message, ffIgnored);
 
 	/* Friend/Foe manager has ignored the message, so ignore here as well. */
 	if(ffIgnored) {
 		return 0; /* Client will ignore the message anyways, so return value here doesn't matter */
 	}
 
-#if 1
-	{
-		/* Example code: Autoreply to sender */
-		/* Disabled because quite annoying, but should give you some ideas what is possible here */
-		/* Careful, when two clients use this, they will get banned quickly... */
-		anyID myID;
-		if(ts3Functions.getClientID(serverConnectionHandlerID, &myID) != ERROR_ok) {
-			ts3Functions.logMessage("Error querying own client id", LogLevel_ERROR, "Plugin", serverConnectionHandlerID);
-			return 0;
-		}
-		if(fromID != myID) {  /* Don't reply when source is own client */
-			if(ts3Functions.requestSendPrivateTextMsg(serverConnectionHandlerID, "Schnauze", fromID, NULL) != ERROR_ok) {
-				ts3Functions.logMessage("Error requesting send text message", LogLevel_ERROR, "Plugin", serverConnectionHandlerID);
-			}
-		}
-	}
-#endif
-
 	return 0;  /* 0 = handle normally, 1 = client will ignore the text message */
 }
 
 void ts3plugin_onTalkStatusChangeEvent(uint64 serverConnectionHandlerID, int status, int isReceivedWhisper, anyID clientID) {
-	/* Demonstrate usage of getClientDisplayName */
-	char name[512];
-	if(ts3Functions.getClientDisplayName(serverConnectionHandlerID, clientID, name, 512) == ERROR_ok) {
-		if(status == STATUS_TALKING) {
-			printf("--> %s starts talking\n", name);
-		} else {
-			printf("--> %s stops talking\n", name);
-		}
-	}
 }
 
 void ts3plugin_onConnectionInfoEvent(uint64 serverConnectionHandlerID, anyID clientID) {
@@ -905,26 +759,6 @@ void ts3plugin_onClientBanFromServerEvent(uint64 serverConnectionHandlerID, anyI
 }
 
 int ts3plugin_onClientPokeEvent(uint64 serverConnectionHandlerID, anyID fromClientID, const char* pokerName, const char* pokerUniqueIdentity, const char* message, int ffIgnored) {
-	anyID myID;
-
-	printf("PLUGIN onClientPokeEvent: %llu %d %s %s %d\n", (long long unsigned int)serverConnectionHandlerID, fromClientID, pokerName, message, ffIgnored);
-
-	/* Check if the Friend/Foe manager has already blocked this poke */
-	if(ffIgnored) {
-		return 0;  /* Client will block anyways, doesn't matter what we return */
-	}
-
-	/* Example code: Send text message back to poking client */
-	if(ts3Functions.getClientID(serverConnectionHandlerID, &myID) != ERROR_ok) {  /* Get own client ID */
-		ts3Functions.logMessage("Error querying own client id", LogLevel_ERROR, "Plugin", serverConnectionHandlerID);
-		return 0;
-	}
-	if(fromClientID != myID) {  /* Don't reply when source is own client */
-		if(ts3Functions.requestSendPrivateTextMsg(serverConnectionHandlerID, "Poke my ass", fromClientID, NULL) != ERROR_ok) {
-			ts3Functions.logMessage("Error requesting send text message", LogLevel_ERROR, "Plugin", serverConnectionHandlerID);
-		}
-	}
-
 	return 0;  /* 0 = handle normally, 1 = client will ignore the poke */
 }
 
@@ -1063,7 +897,6 @@ void ts3plugin_onClientServerQueryLoginPasswordEvent(uint64 serverConnectionHand
 }
 
 void ts3plugin_onPluginCommandEvent(uint64 serverConnectionHandlerID, const char* pluginName, const char* pluginCommand) {
-	printf("ON PLUGIN COMMAND: %s %s\n", pluginName, pluginCommand);
 }
 
 void ts3plugin_onIncomingClientQueryEvent(uint64 serverConnectionHandlerID, const char* commandText) {
@@ -1081,11 +914,6 @@ void ts3plugin_onServerTemporaryPasswordListEvent(uint64 serverConnectionHandler
 void ts3plugin_onAvatarUpdated(uint64 serverConnectionHandlerID, anyID clientID, const char* avatarPath) {
 	/* If avatarPath is NULL, the avatar got deleted */
 	/* If not NULL, avatarPath contains the path to the avatar file in the TS3Client cache */
-	if(avatarPath != NULL) {
-		printf("onAvatarUpdated: %llu %d %s\n", (long long unsigned int)serverConnectionHandlerID, clientID, avatarPath);
-	} else {
-		printf("onAvatarUpdated: %llu %d - deleted\n", (long long unsigned int)serverConnectionHandlerID, clientID);
-	}
 }
 
 /*
@@ -1135,7 +963,7 @@ void ts3plugin_onMenuItemEvent(uint64 serverConnectionHandlerID, enum PluginMenu
 			switch(menuItemID) {
 				case MENU_ID_CLIENT_1:
 					/* Menu client 1 was triggered */
-					EasyAvatar_UploadImage(serverConnectionHandlerID);
+					EasyAvatar_SetAvatar(serverConnectionHandlerID);
 					break;
 				case MENU_ID_CLIENT_2:
 					/* Menu client 2 was triggered */
@@ -1157,6 +985,9 @@ void ts3plugin_onHotkeyEvent(const char* keyword) {
 
 /* Called when recording a hotkey has finished after calling ts3Functions.requestHotkeyInputDialog */
 void ts3plugin_onHotkeyRecordedEvent(const char* keyword, const char* key) {
+	char buf[64];
+	snprintf(buf, sizeof(buf), "Hotkey for %s registered: %s", keyword, key);
+	ts3Functions.logMessage(buf, LogLevel_INFO, EASYAVATAR_LOGCHANNEL, 0);
 }
 
 // This function receives your key Identifier you send to notifyKeyEvent and should return
@@ -1173,7 +1004,7 @@ const char* ts3plugin_displayKeyText(const char* keyIdentifier) {
 // This is used internally as a prefix for hotkeys so we can store them without collisions.
 // Should be unique across plugins.
 const char* ts3plugin_keyPrefix() {
-	return NULL;
+	return "ez_avatar";
 }
 
 /* Called when client custom nickname changed */
@@ -1184,15 +1015,24 @@ void ts3plugin_onClientDisplayNameChanged(uint64 serverConnectionHandlerID, anyI
 
 /* My functions */
 
-int EasyAvatar_UploadImage(uint64 serverConnectionHandlerID)
+int EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID)
 {
-	ts3Functions.logMessage("Called MyPluginUploadImage", LogLevel_DEBUG, MYPLUGIN_LOGCHANNEL, serverConnectionHandlerID);
+	ts3Functions.logMessage("Called EasyAvatar_SetAvatar", LogLevel_DEBUG, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
+
+	CURL* curl;
+	curl = curl_easy_init();
+	if (!curl)
+	{
+		ts3Functions.logMessage("Error creating Curl object", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
+		return 0;
+	}
 
 	// Uniquely identifies our client on the server
 	anyID myID;
 	if (ts3Functions.getClientID(serverConnectionHandlerID, &myID) != ERROR_ok)
-	{  /* Get own client ID */
-		ts3Functions.logMessage("Error querying own client id", LogLevel_ERROR, MYPLUGIN_LOGCHANNEL, serverConnectionHandlerID);
+	{
+		ts3Functions.logMessage("Error querying own client id", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
+		curl_easy_cleanup(curl);
 		return 0;
 	}
 
@@ -1211,56 +1051,110 @@ int EasyAvatar_UploadImage(uint64 serverConnectionHandlerID)
 	clientIDHash = EasyAvatar_b64encode(clientID, clientIDHashLen, clientIDHashLen);
 	if (!clientIDHash)
 	{
-		ts3Functions.logMessage("Failed to create base64 hash of clientID", LogLevel_ERROR, MYPLUGIN_LOGCHANNEL, serverConnectionHandlerID);
-		return 0;
-	}
-
-	// Currently just takes the file path for testing purposes
-	md5Hash = EasyAvatar_CreateMD5Hash("", serverConnectionHandlerID);
-	if (!md5Hash)
-	{
-		ts3Functions.logMessage("Failed to create MD5 hash of file contents", LogLevel_ERROR, MYPLUGIN_LOGCHANNEL, serverConnectionHandlerID);
-		ts3Functions.freeMemory(clientIDHash);
+		ts3Functions.logMessage("Failed to create base64 hash of clientID", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
+		curl_easy_cleanup(curl);
 		return 0;
 	}
 
 	char fileName[128];
 	snprintf(fileName, sizeof(fileName), "avatar_%s", clientIDHash);
-	
+
+	// Get image from URL
+	char* imageURL = EasyAvatar_GetLinkFromClipboard(serverConnectionHandlerID);
+	if (!imageURL)
+	{
+		ts3Functions.logMessage("Failed to get Image URL from Clipboard", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
+		ts3Functions.freeMemory(clientIDHash);
+		curl_easy_cleanup(curl);
+	}
+
+	struct FileOut file;
+	file.filename = fileName;
+	file.stream = NULL;
+
+	// https://github.com/curl/curl/blob/master/docs/examples/getinmemory.c
+	curl_easy_setopt(curl, CURLOPT_URL, imageURL);
+	// Define our callback to get called when there's data to be written
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, EasyAvatar_WriteFile);
+	// Set a pointer to our struct that gets passed to the callback
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &file);
+	// Some servers don't like requests that are made without a user-agent field, so we provide one
+	curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcurl-agent/1.0");
+
+	CURLcode res = curl_easy_perform(curl);
+	if (res != CURLE_OK)
+	{
+		char buf[1024];
+		snprintf(buf, sizeof(buf), "Failed to download from: %s", imageURL);
+		ts3Functions.logMessage(buf, LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
+		ts3Functions.freeMemory(clientIDHash);
+		ts3Functions.freeMemory(imageURL);
+		curl_easy_cleanup(curl);
+
+		// File may not have been closed correctly by our Callback
+		if (file.stream)
+			fclose(file.stream);
+
+		return 0;
+	}
+	else
+	{
+		// Our EasyAvatar_WriteFile successfully wrote the file to disk with the correct name "avatar_::"
+	}
+
+	ts3Functions.freeMemory(imageURL);
+
+	char filePath[PATH_BUFSIZE];
+	snprintf(filePath, sizeof(filePath), "%s\\%s", EASYAVATAR_FILEPATH, fileName);
+	// Currently just takes the file path for testing purposes
+	md5Hash = EasyAvatar_CreateMD5Hash(filePath, serverConnectionHandlerID);
+	if (!md5Hash)
+	{
+		ts3Functions.logMessage("Failed to create MD5 hash of file contents", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
+		ts3Functions.freeMemory(clientIDHash);
+		curl_easy_cleanup(curl);
+		return 0;
+	}
 
 	// Upload the image to the virtual servers internal file repository (channel with ID 0)
 	// Apparently still returns ERROR_ok even if the path to the image is invalid
-	if (ts3Functions.sendFile(serverConnectionHandlerID, channelID, "", "avatar_MjAyNz0=", 1, 0, MYPLUGIN_FILEPATH, &transferID, NULL) != ERROR_ok)
+	if (ts3Functions.sendFile(serverConnectionHandlerID, channelID, "", fileName, 1, 0, EASYAVATAR_FILEPATH, &transferID, NULL) != ERROR_ok)
 	{
-		ts3Functions.logMessage("Failed to upload file.", LogLevel_ERROR, MYPLUGIN_LOGCHANNEL, serverConnectionHandlerID);
+		ts3Functions.logMessage("Failed to upload file.", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
+		ts3Functions.freeMemory(clientIDHash);
+		ts3Functions.freeMemory(md5Hash);
+		curl_easy_cleanup(curl);
 		return 0;
 	}
 
 	char msg[1024];
 	snprintf(msg, sizeof(msg), "Successfully uploaded file. Transfer ID: %hu ; ClientID: %hu; clientIDHash: %s, MD5Hash: %s", transferID, myID, clientIDHash, md5Hash);
-	ts3Functions.logMessage(msg, LogLevel_DEBUG, MYPLUGIN_LOGCHANNEL, serverConnectionHandlerID);
+	ts3Functions.logMessage(msg, LogLevel_DEBUG, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
 
 	// Set the CLIENT_FLAG_AVATAR attribute of our client to the md5 hash of the image file
 	if (ts3Functions.setClientSelfVariableAsString(serverConnectionHandlerID, CLIENT_FLAG_AVATAR, md5Hash) != ERROR_ok)
 	{
+		ts3Functions.logMessage("Failed to set CLIENT_FLAG_AVATAR", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
 		ts3Functions.freeMemory(clientIDHash);
 		ts3Functions.freeMemory(md5Hash);
-		ts3Functions.logMessage("Failed to set CLIENT_FLAG_AVATAR", LogLevel_ERROR, MYPLUGIN_LOGCHANNEL, serverConnectionHandlerID);
+		curl_easy_cleanup(curl);
 		return 0;
 	}
 
 	// Flush all changes to the server
 	if (ts3Functions.flushClientSelfUpdates(serverConnectionHandlerID, NULL) != ERROR_ok)
 	{
+		ts3Functions.logMessage("Failed to flush changes", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
 		ts3Functions.freeMemory(clientIDHash);
 		ts3Functions.freeMemory(md5Hash);
-		ts3Functions.logMessage("Failed to flush changes", LogLevel_ERROR, MYPLUGIN_LOGCHANNEL, serverConnectionHandlerID);
+		curl_easy_cleanup(curl);
 		return 0;
 	}
 
+	curl_easy_cleanup(curl);
 	ts3Functions.freeMemory(clientIDHash);
 	ts3Functions.freeMemory(md5Hash);
-	ts3Functions.logMessage("Set avatar successfully!", LogLevel_INFO, MYPLUGIN_LOGCHANNEL, serverConnectionHandlerID);
+	ts3Functions.logMessage("Avatar set successfully!", LogLevel_INFO, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
 
 	// Return true if everything worked as expected
 	return 1;
@@ -1276,28 +1170,28 @@ int EasyAvatar_CreateDirectory()
 	ts3Functions.getPluginPath(currentDirectory, PATH_BUFSIZE, pluginID);
 	
 	// Construct the path for our plugin's directory and then create the directory
-	snprintf(pluginDirectory, sizeof(pluginDirectory), "%s\\easy_avatar", currentDirectory);
+	snprintf(pluginDirectory, sizeof(pluginDirectory), "%s\\%s", currentDirectory, EASYAVATAR_DIR);
 	if (!CreateDirectoryA(pluginDirectory, NULL))
 	{
 		// CreateDirectory can fail if the directory already exists, check last error
 		if (GetLastError() != ERROR_ALREADY_EXISTS)
 		{
 			// CreateDirectory failed for another reason, abort
-			ts3Functions.logMessage("Failed to create plugin directory!", LogLevel_ERROR, MYPLUGIN_LOGCHANNEL, 0);
+			ts3Functions.logMessage("Failed to create plugin directory!", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, 0);
 			return 0;
 		}
 		else
 		{
-			ts3Functions.logMessage("Plugin directory already exists", LogLevel_INFO, MYPLUGIN_LOGCHANNEL, 0);
+			ts3Functions.logMessage("Plugin directory already exists", LogLevel_INFO, EASYAVATAR_LOGCHANNEL, 0);
 		}
 	}
 	else
 	{
-		ts3Functions.logMessage("Successfully created plugin directory", LogLevel_INFO, MYPLUGIN_LOGCHANNEL, 0);
+		ts3Functions.logMessage("Successfully created plugin directory", LogLevel_INFO, EASYAVATAR_LOGCHANNEL, 0);
 	}
 
 	// Copy the path to the directory we just created into a global buffer
-	_strcpy(MYPLUGIN_FILEPATH, PATH_BUFSIZE, pluginDirectory);
+	_strcpy(EASYAVATAR_FILEPATH, PATH_BUFSIZE, pluginDirectory);
 
 	return 1;
 }
@@ -1315,7 +1209,7 @@ char* EasyAvatar_GetLinkFromClipboard(uint64 serverConnectionHandlerID)
 	// Check that the clipboard wasn't empty
 	if (!hGlobalMem || !clipboardStr || !clipBoardDataLength)
 	{
-		ts3Functions.logMessage("Failed to get Clipboard contents.", LogLevel_ERROR, MYPLUGIN_LOGCHANNEL, serverConnectionHandlerID);
+		ts3Functions.logMessage("Failed to get Clipboard contents.", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
 		GlobalUnlock(hGlobalMem);
 		CloseClipboard();
 		return NULL;
@@ -1348,6 +1242,7 @@ char* EasyAvatar_GetLinkFromClipboard(uint64 serverConnectionHandlerID)
 }
 
 // Taken from https://stackoverflow.com/a/48818578
+	
 char* EasyAvatar_b64encode(const unsigned char* data, size_t input_length, size_t output_length)
 {
 	const int mod_table[] = { 0, 2, 1 };
@@ -1386,6 +1281,7 @@ char* EasyAvatar_b64encode(const unsigned char* data, size_t input_length, size_
 };
 
 // As specified by https://docs.microsoft.com/en-us/windows/win32/seccrypto/example-c-program--creating-an-md-5-hash-from-file-content
+
 char* EasyAvatar_CreateMD5Hash(const char* filePath, uint64 serverConnectionHandlerID)
 {
 	DWORD dwStatus = 0;
@@ -1411,7 +1307,7 @@ char* EasyAvatar_CreateMD5Hash(const char* filePath, uint64 serverConnectionHand
 	{
 		char errorMessage[1024];
 		snprintf(errorMessage, sizeof(errorMessage), "Error openen file for hashing: Filepath: %s  Error Code: %d", filePath, GetLastError());
-		ts3Functions.logMessage(errorMessage, LogLevel_ERROR, MYPLUGIN_LOGCHANNEL, serverConnectionHandlerID);
+		ts3Functions.logMessage(errorMessage, LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
 		return NULL;
 	}
 
@@ -1486,4 +1382,23 @@ char* EasyAvatar_CreateMD5Hash(const char* filePath, uint64 serverConnectionHand
 	CloseHandle(hFile);
 
 	return imageMD5Hash;
+}
+
+size_t EasyAvatar_WriteFile(void* buffer, size_t size, size_t nmemb, void* stream)
+{
+	struct FileOut* out = (struct FileOut*)stream;
+
+	if (out && !out->stream) 
+	{
+		char filePath[PATH_BUFSIZE];
+		snprintf(filePath, sizeof(filePath), "%s\\%s", EASYAVATAR_FILEPATH, out->filename);
+		if (fopen_s(&out->stream, filePath, "wb") != 0)
+			return -1;
+
+		size_t res = fwrite(buffer, size, nmemb, out->stream);
+		fclose(out->stream);
+		return res;
+	}
+	
+	return -1;
 }
