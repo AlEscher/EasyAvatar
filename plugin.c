@@ -676,61 +676,17 @@ void ts3plugin_onAvatarUpdated(uint64 serverConnectionHandlerID, anyID clientID,
  * - menuItemID: Id used when creating the menu item
  * - selectedItemID: Channel or Client ID in the case of PLUGIN_MENU_TYPE_CHANNEL and PLUGIN_MENU_TYPE_CLIENT. 0 for PLUGIN_MENU_TYPE_GLOBAL.
  */
-void ts3plugin_onMenuItemEvent(uint64 serverConnectionHandlerID, enum PluginMenuType type, int menuItemID, uint64 selectedItemID) {
-	printf("PLUGIN: onMenuItemEvent: serverConnectionHandlerID=%llu, type=%d, menuItemID=%d, selectedItemID=%llu\n", (long long unsigned int)serverConnectionHandlerID, type, menuItemID, (long long unsigned int)selectedItemID);
-
-	switch(type) {
-		case PLUGIN_MENU_TYPE_GLOBAL:
-			/* Global menu item was triggered. selectedItemID is unused and set to zero. */
-			switch(menuItemID) {
-				case MENU_ID_GLOBAL_1:
-					/* Menu global 1 was triggered */
-					break;
-				case MENU_ID_GLOBAL_2:
-					/* Menu global 2 was triggered */
-					break;
-				default:
-					break;
-			}
-			break;
-		case PLUGIN_MENU_TYPE_CHANNEL:
-			/* Channel contextmenu item was triggered. selectedItemID is the channelID of the selected channel */
-			switch(menuItemID) {
-				case MENU_ID_CHANNEL_1:
-					/* Menu channel 1 was triggered */
-					break;
-				case MENU_ID_CHANNEL_2:
-					/* Menu channel 2 was triggered */
-					break;
-				case MENU_ID_CHANNEL_3:
-					/* Menu channel 3 was triggered */
-					break;
-				default:
-					break;
-			}
-			break;
-		case PLUGIN_MENU_TYPE_CLIENT:
-			/* Client contextmenu item was triggered. selectedItemID is the clientID of the selected client */
-			switch(menuItemID) {
-				case MENU_ID_CLIENT_1:
-					/* Menu client 1 was triggered */
-					EasyAvatar_SetAvatar(serverConnectionHandlerID);
-					break;
-				case MENU_ID_CLIENT_2:
-					/* Menu client 2 was triggered */
-					break;
-				default:
-					break;
-			}
-			break;
-		default:
-			break;
+void ts3plugin_onMenuItemEvent(uint64 serverConnectionHandlerID, enum PluginMenuType type, int menuItemID, uint64 selectedItemID) 
+{
+	if (type == PLUGIN_MENU_TYPE_CLIENT && menuItemID == MENU_ID_CLIENT_1)
+	{
+		EasyAvatar_SetAvatar(serverConnectionHandlerID);
 	}
 }
 
 /* This function is called if a plugin hotkey was pressed. Omit if hotkeys are unused. */
-void ts3plugin_onHotkeyEvent(const char* keyword) {
-	/* Identify the hotkey by keyword ("keyword_1", "keyword_2" or "keyword_3" in this example) and handle here... */
+void ts3plugin_onHotkeyEvent(const char* keyword) 
+{
 	if (strncmp(keyword, "ez_set_avatar", 13) == 0)
 	{
 		EasyAvatar_SetAvatar(ts3Functions.getCurrentServerConnectionHandlerID());
