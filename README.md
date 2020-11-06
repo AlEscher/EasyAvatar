@@ -25,3 +25,7 @@ You can bind the Setting of your Avatar to a Hot-Key.
 To do this, click on "Tools" -> "Options" -> "Hotkeys" and press "Add".  
 Click on "Show Advanced Actions", find and open up "Plugins" -> "Plugin Hotkey" -> "EasyAvatar" -> "Set Avatar" and then set a Hotkey.  
 Once you have the Hotkey set up, simply copy any URL of an image (ending with e.g. ".jpg") and press the Hotkey.
+
+## Dependencies
+
+I am using [FreeImage](http://freeimage.sourceforge.net) for image operations such as resizing
