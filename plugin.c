@@ -10,6 +10,7 @@
 #endif
 
 #pragma comment(lib, "Urlmon.lib")
+#pragma comment(lib, "FreeImageLib.lib")
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,6 +25,8 @@
 #include "teamspeak/clientlib_publicdefinitions.h"
 #include "ts3_functions.h"
 #include "plugin.h"
+
+#include "FreeImage/FreeImage.h"
 
 
 
@@ -125,6 +128,8 @@ int ts3plugin_init() {
 	if (!EasyAvatar_CreateDirectory())
 		return 1;
 
+	FreeImage_Initialise(1);
+
 	ts3Functions.logMessage("Init successfull", LogLevel_DEBUG, EASYAVATAR_LOGCHANNEL, 0);
 	/* Example on how to query application, resources and configuration paths from client */
 	/* Note: Console client returns empty string for app and resources path */
@@ -147,6 +152,7 @@ int ts3plugin_init() {
 void ts3plugin_shutdown() {
 	/* Your plugin cleanup code here */
 	
+	FreeImage_DeInitialise();
 
 	/*
 	 * Note:
@@ -680,7 +686,13 @@ void ts3plugin_onMenuItemEvent(uint64 serverConnectionHandlerID, enum PluginMenu
 {
 	if (type == PLUGIN_MENU_TYPE_CLIENT && menuItemID == MENU_ID_CLIENT_1)
 	{
-		EasyAvatar_SetAvatar(serverConnectionHandlerID);
+		// If we fail setting the avatar, your Avatar becomse a 404 red image
+		// and subsequent attempts at setting a new image may have no effects, so we reset it
+		if (!EasyAvatar_SetAvatar(serverConnectionHandlerID))
+		{
+			EasyAvatar_DeleteAvatar(serverConnectionHandlerID);
+		}
+		
 	}
 }
 
@@ -689,7 +701,12 @@ void ts3plugin_onHotkeyEvent(const char* keyword)
 {
 	if (strncmp(keyword, "ez_set_avatar", 13) == 0)
 	{
-		EasyAvatar_SetAvatar(ts3Functions.getCurrentServerConnectionHandlerID());
+		// If we fail setting the avatar, your Avatar becomse a 404 red image
+		// and subsequent attempts at setting a new image may have no effects, so we reset it
+		if (!EasyAvatar_SetAvatar(ts3Functions.getCurrentServerConnectionHandlerID()))
+		{
+			EasyAvatar_DeleteAvatar(ts3Functions.getCurrentServerConnectionHandlerID());
+		}
 	}
 }
 
@@ -759,23 +776,22 @@ int EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID)
 	char fileName[128];
 	snprintf(fileName, sizeof(fileName), "avatar_%s", clientIDHash);
 
-	// Get image from URL
+	// Get image URL from Clipboard, if that fails try to see if a file is copied
 	char* imageURL = EasyAvatar_GetLinkFromClipboard(serverConnectionHandlerID);
 	if (!imageURL)
 	{
+		// Try to get a file from clipboard
+		// EasyAvatar_GetFileFromClipboard(serverConnectionHandlerID);
 		ts3Functions.logMessage("Failed to get Image URL from Clipboard", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
 		ts3Functions.freeMemory(clientIDHash);
 		return 0;
 	}
 	
 
-	// Absolute file path to our image file
-	char filePath[PATH_BUFSIZE];
-	snprintf(filePath, sizeof(filePath), "%s\\%s", EASYAVATAR_FILEPATH, fileName);
+	snprintf(EASYAVATAR_IMAGEPATH, sizeof(EASYAVATAR_IMAGEPATH), "%s\\%s", EASYAVATAR_FILEPATH, fileName);
 
-	// TODO: Should take result of GetLinkFromClipboard, but doesn't currently work
-	HRESULT res = URLDownloadToFileA(NULL, imageURL, filePath, 0, NULL);
-	if (res != S_OK)
+	HRESULT downloadRes = URLDownloadToFileA(NULL, imageURL, EASYAVATAR_IMAGEPATH, 0, NULL);
+	if (downloadRes != S_OK)
 	{
 		ts3Functions.logMessage("Download of image failed", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
 		ts3Functions.freeMemory(imageURL);
@@ -785,7 +801,9 @@ int EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID)
 
 	ts3Functions.freeMemory(imageURL);
 
-	md5Hash = EasyAvatar_CreateMD5Hash(filePath, serverConnectionHandlerID);
+	EasyAvatar_ResizeAvatar();
+
+	md5Hash = EasyAvatar_CreateMD5Hash(EASYAVATAR_IMAGEPATH, serverConnectionHandlerID);
 	if (!md5Hash)
 	{
 		ts3Functions.logMessage("Failed to create MD5 hash of file contents", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
@@ -833,6 +851,27 @@ int EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID)
 	return 1;
 }
 
+int EasyAvatar_DeleteAvatar(uint64 serverConnectionHandlerID)
+{
+	ts3Functions.logMessage("Something went wrong, deleting avatar", LogLevel_INFO, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
+
+	// Set the CLIENT_FLAG_AVATAR to an empty string to signal that we want to delete / reset it
+	if (ts3Functions.setClientSelfVariableAsString(serverConnectionHandlerID, CLIENT_FLAG_AVATAR, "") != ERROR_ok)
+	{
+		ts3Functions.logMessage("Failed to set CLIENT_FLAG_AVATAR while deleting Avatar", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
+		return 0;
+	}
+
+	// Flush all changes to the server
+	if (ts3Functions.flushClientSelfUpdates(serverConnectionHandlerID, NULL) != ERROR_ok)
+	{
+		ts3Functions.logMessage("Failed to flush changes while deleting Avatar", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
+		return 0;
+	}
+
+	return 1;
+}
+
 // If anything in this function fails, the plugin will be unloaded
 int EasyAvatar_CreateDirectory()
 {
@@ -871,9 +910,14 @@ int EasyAvatar_CreateDirectory()
 
 char* EasyAvatar_GetLinkFromClipboard(uint64 serverConnectionHandlerID)
 {
-	// Request ownership of the clipboard
-	if (!OpenClipboard(GetActiveWindow()))
+	if (!OpenClipboard(NULL))
 		return NULL;
+
+	if (!IsClipboardFormatAvailable(CF_TEXT))
+	{
+		CloseClipboard();
+		return NULL;
+	}
 
 	// Allocate a global memory object for the text. +1 for null termination
 	HGLOBAL hGlobalMem = GetClipboardData(CF_TEXT);
@@ -912,6 +956,28 @@ char* EasyAvatar_GetLinkFromClipboard(uint64 serverConnectionHandlerID)
 	{
 		return clipBoardContent;
 	}
+}
+
+int EasyAvatar_GetFileFromClipboard(uint64 serverConnectionHandlerID)
+{
+	if (!OpenClipboard(NULL))
+		return 0;
+
+	// Never works
+	if (!IsClipboardFormatAvailable(CF_DIBV5))
+	{
+		CloseClipboard();
+		return 0;
+	}
+
+	HGLOBAL hGlobalMem = GetClipboardData(CF_DIBV5);
+	BITMAPINFO* bitMapInfo = (BITMAPINFO*)GlobalLock(hGlobalMem);
+
+	GlobalUnlock(hGlobalMem);
+	CloseClipboard();
+	return 1;
+
+
 }
 
 // Taken from https://stackoverflow.com/a/48818578
@@ -1055,4 +1121,42 @@ char* EasyAvatar_CreateMD5Hash(const char* filePath, uint64 serverConnectionHand
 	CloseHandle(hFile);
 
 	return imageMD5Hash;
+}
+
+int EasyAvatar_ResizeAvatar()
+{
+	// Dynamically get the image type (.png, .jpg, etc...)
+	FREE_IMAGE_FORMAT imgFormat = FreeImage_GetFileType(EASYAVATAR_IMAGEPATH, 0);
+	FIBITMAP* avatarImage = FreeImage_Load(imgFormat, EASYAVATAR_IMAGEPATH, 0);
+	if (!avatarImage)
+	{
+		return 0;
+	}
+
+	unsigned int originalH = FreeImage_GetHeight(avatarImage);
+	unsigned int originalW = FreeImage_GetWidth(avatarImage);
+	unsigned int targetH = originalH;
+	unsigned int targetW = originalW;
+	
+	// TODO: Keep aspect ratio
+	if (originalH > 300)
+		targetH = 300;
+	if (originalW > 300)
+		targetW = 300;
+	
+	// Resize our avatar
+	FIBITMAP* resizedImage = FreeImage_Rescale(avatarImage, targetW, targetH, FILTER_BOX);
+	if (!resizedImage)
+	{
+		FreeImage_Unload(avatarImage);
+		return 0;
+	}
+
+	// FreeImage_Save overwriting old avatar file
+	FreeImage_Save(imgFormat, resizedImage, EASYAVATAR_IMAGEPATH, 0);
+
+	FreeImage_Unload(avatarImage);
+	FreeImage_Unload(resizedImage);
+
+	return 1;
 }

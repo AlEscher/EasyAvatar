@@ -149,7 +149,7 @@ PLUGINS_EXPORTDLL const char* ts3plugin_keyPrefix();
 
 #define PATH_BUFSIZE 512
 
-// Documentation strongly recommends putting all your code in the plugin files
+// Have to put everyhing in plugin.h and plugin.c since Teamspeak SDK defines all their stuff in header files
 /* My definitions */
 
 /* Functions */
@@ -158,6 +158,10 @@ PLUGINS_EXPORTDLL const char* ts3plugin_keyPrefix();
 	Uploads an image to the server, aswell as setting all necessary parameters for it to be registered as the user's Avatar
 */
 int EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID);
+/*
+	Deletes your avatar in case something went wrong while setting it.
+*/
+int EasyAvatar_DeleteAvatar(uint64 serverConnectionHandlerID);
 
 /*
 	Create a directory for our plugin inside of plugins
@@ -171,11 +175,17 @@ char* EasyAvatar_b64encode(const unsigned char* data, size_t input_length, size_
 	Returns NULL if anything fails
 */
 char* EasyAvatar_GetLinkFromClipboard(uint64 serverConnectionHandlerID);
+int EasyAvatar_GetFileFromClipboard(uint64 serverConnectionHandlerID);
 
 /*
 	Returns a heap allocated MD5 Hash of the given file
 */
 char* EasyAvatar_CreateMD5Hash(const char* filePath, uint64 serverConnectionHandlerID);
+
+/*
+	Resize our avatar file on disk
+*/
+int EasyAvatar_ResizeAvatar();
 
 
 /* Other stuff */
@@ -185,7 +195,10 @@ char* EasyAvatar_CreateMD5Hash(const char* filePath, uint64 serverConnectionHand
 #define EASYAVATAR_DIR "easy_avatar"
 #define BUFSIZE 1024
 #define MD5LEN  16
+// Path to our plugin's directory
 char EASYAVATAR_FILEPATH[PATH_BUFSIZE];
+// Absolute file path to our image file
+char EASYAVATAR_IMAGEPATH[PATH_BUFSIZE];
 
 static const char encoding_table[] = {
 			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
