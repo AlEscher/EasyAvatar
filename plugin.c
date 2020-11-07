@@ -116,11 +116,6 @@ void ts3plugin_setFunctionPointers(const struct TS3Functions funcs) {
  * If the function returns 1 on failure, the plugin will be unloaded again.
  */
 int ts3plugin_init() {
-	char appPath[PATH_BUFSIZE];
-	char resourcesPath[PATH_BUFSIZE];
-	char configPath[PATH_BUFSIZE];
-	char pluginPath[PATH_BUFSIZE];
-
 	/* Your plugin init code here */
 
 	ts3Functions.logMessage("Plugin Init", LogLevel_DEBUG, EASYAVATAR_LOGCHANNEL, 0);
@@ -128,19 +123,9 @@ int ts3plugin_init() {
 	if (!EasyAvatar_CreateDirectory())
 		return 1;
 
-	FreeImage_Initialise(1);
+	FreeImage_Initialise(TRUE);
 
 	ts3Functions.logMessage("Init successfull", LogLevel_DEBUG, EASYAVATAR_LOGCHANNEL, 0);
-	/* Example on how to query application, resources and configuration paths from client */
-	/* Note: Console client returns empty string for app and resources path */
-	ts3Functions.getAppPath(appPath, PATH_BUFSIZE);
-	ts3Functions.getResourcesPath(resourcesPath, PATH_BUFSIZE);
-	ts3Functions.getConfigPath(configPath, PATH_BUFSIZE);
-	ts3Functions.getPluginPath(pluginPath, PATH_BUFSIZE, pluginID);
-
-	/*char buffer[4096];
-	snprintf(buffer, sizeof(buffer), "PLUGIN: App path: %s\nResources path: %s\nConfig path: %s\nPlugin path: %s\n", appPath, resourcesPath, configPath, pluginPath);
-	ts3Functions.logMessage(buffer, LogLevel_DEBUG, EASYAVATAR_LOGCHANNEL, 0);*/
 
 	return 0;  /* 0 = success, 1 = failure, -2 = failure but client will not show a "failed to load" warning */
 	/* -2 is a very special case and should only be used if a plugin displays a dialog (e.g. overlay) asking the user to disable
@@ -749,8 +734,6 @@ void ts3plugin_onClientDisplayNameChanged(uint64 serverConnectionHandlerID, anyI
 
 BOOL EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID)
 {
-	ts3Functions.logMessage("Called EasyAvatar_SetAvatar", LogLevel_DEBUG, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
-
 	// Uniquely identifies our client on the server
 	anyID myID;
 	if (ts3Functions.getClientID(serverConnectionHandlerID, &myID) != ERROR_ok)
@@ -827,9 +810,6 @@ BOOL EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID)
 		return FALSE;
 	}
 
-	char msg[1024];
-	snprintf(msg, sizeof(msg), "Successfully uploaded file. Transfer ID: %hu ; ClientID: %hu; clientIDHash: %s, MD5Hash: %s", transferID, myID, clientIDHash, md5Hash);
-	ts3Functions.logMessage(msg, LogLevel_DEBUG, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
 
 	// Set the CLIENT_FLAG_AVATAR attribute of our client to the md5 hash of the image file in order to register it as our Avatar
 	if (ts3Functions.setClientSelfVariableAsString(serverConnectionHandlerID, CLIENT_FLAG_AVATAR, md5Hash) != ERROR_ok)
@@ -1131,7 +1111,7 @@ char* EasyAvatar_CreateMD5Hash(const char* filePath, uint64 serverConnectionHand
 
 BOOL EasyAvatar_ResizeAvatar()
 {
-	// Dynamically get the image type (.png, .jpg, etc...)
+	// Dynamically get the image type (png, jpg, etc...)
 	FREE_IMAGE_FORMAT imgFormat = FreeImage_GetFileType(EASYAVATAR_IMAGEPATH, 0);
 	FIBITMAP* avatarImage = FreeImage_Load(imgFormat, EASYAVATAR_IMAGEPATH, 0);
 	if (!avatarImage)
@@ -1143,12 +1123,18 @@ BOOL EasyAvatar_ResizeAvatar()
 	unsigned int originalW = FreeImage_GetWidth(avatarImage);
 	unsigned int targetH = originalH;
 	unsigned int targetW = originalW;
+	float aspectRatio = (float)originalW / (float)originalH;
 	
-	// TODO: Keep aspect ratio
-	if (originalH > 300)
-		targetH = 300;
 	if (originalW > 300)
+	{
 		targetW = 300;
+		targetH = (unsigned int)(targetW / aspectRatio);
+	}
+	else if (originalH > 300)
+	{
+		targetH = 300;
+		targetW = (unsigned int)(targetH * aspectRatio);
+	}
 	
 	// Resize our avatar
 	FIBITMAP* resizedImage = FreeImage_Rescale(avatarImage, targetW, targetH, FILTER_BOX);
