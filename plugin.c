@@ -118,14 +118,14 @@ void ts3plugin_setFunctionPointers(const struct TS3Functions funcs) {
 int ts3plugin_init() {
 	/* Your plugin init code here */
 
-	ts3Functions.logMessage("Plugin Init", LogLevel_DEBUG, EASYAVATAR_LOGCHANNEL, 0);
+	ts3Functions.logMessage("Plugin Init", LogLevel_INFO, EASYAVATAR_LOGCHANNEL, 0);
 
 	if (!EasyAvatar_CreateDirectory())
 		return 1;
 
 	FreeImage_Initialise(TRUE);
 
-	ts3Functions.logMessage("Init successfull", LogLevel_DEBUG, EASYAVATAR_LOGCHANNEL, 0);
+	ts3Functions.logMessage("Init successfull", LogLevel_INFO, EASYAVATAR_LOGCHANNEL, 0);
 
 	return 0;  /* 0 = success, 1 = failure, -2 = failure but client will not show a "failed to load" warning */
 	/* -2 is a very special case and should only be used if a plugin displays a dialog (e.g. overlay) asking the user to disable
@@ -763,6 +763,7 @@ BOOL EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID)
 
 	char fileName[128];
 	snprintf(fileName, sizeof(fileName), "avatar_%s", clientIDHash);
+	ts3Functions.freeMemory(clientIDHash);
 
 	// Get image URL from Clipboard, if that fails try to see if a file is copied
 	char* imageURL = EasyAvatar_GetLinkFromClipboard(serverConnectionHandlerID);
@@ -771,10 +772,8 @@ BOOL EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID)
 		// Try to get a file from clipboard
 		// EasyAvatar_GetFileFromClipboard(serverConnectionHandlerID);
 		ts3Functions.logMessage("Failed to get Image URL from Clipboard", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
-		ts3Functions.freeMemory(clientIDHash);
 		return FALSE;
 	}
-	
 
 	snprintf(EASYAVATAR_IMAGEPATH, sizeof(EASYAVATAR_IMAGEPATH), "%s\\%s", EASYAVATAR_FILEPATH, fileName);
 
@@ -783,7 +782,6 @@ BOOL EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID)
 	{
 		ts3Functions.logMessage("Download of image failed", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
 		ts3Functions.freeMemory(imageURL);
-		ts3Functions.freeMemory(clientIDHash);
 		return FALSE;
 	}
 
@@ -796,7 +794,6 @@ BOOL EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID)
 	if (!md5Hash)
 	{
 		ts3Functions.logMessage("Failed to create MD5 hash of file contents", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
-		ts3Functions.freeMemory(clientIDHash);
 		return FALSE;
 	}
 
@@ -805,7 +802,6 @@ BOOL EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID)
 	if (ts3Functions.sendFile(serverConnectionHandlerID, channelID, "", fileName, 1, 0, EASYAVATAR_FILEPATH, &transferID, NULL) != ERROR_ok)
 	{
 		ts3Functions.logMessage("Failed to upload file.", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
-		ts3Functions.freeMemory(clientIDHash);
 		ts3Functions.freeMemory(md5Hash);
 		return FALSE;
 	}
@@ -815,7 +811,6 @@ BOOL EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID)
 	if (ts3Functions.setClientSelfVariableAsString(serverConnectionHandlerID, CLIENT_FLAG_AVATAR, md5Hash) != ERROR_ok)
 	{
 		ts3Functions.logMessage("Failed to set CLIENT_FLAG_AVATAR", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
-		ts3Functions.freeMemory(clientIDHash);
 		ts3Functions.freeMemory(md5Hash);
 		return FALSE;
 	}
@@ -824,12 +819,10 @@ BOOL EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID)
 	if (ts3Functions.flushClientSelfUpdates(serverConnectionHandlerID, NULL) != ERROR_ok)
 	{
 		ts3Functions.logMessage("Failed to flush changes", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
-		ts3Functions.freeMemory(clientIDHash);
 		ts3Functions.freeMemory(md5Hash);
 		return FALSE;
 	}
 
-	ts3Functions.freeMemory(clientIDHash);
 	ts3Functions.freeMemory(md5Hash);
 	ts3Functions.logMessage("Avatar set successfully!", LogLevel_INFO, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
 
@@ -949,14 +942,16 @@ BOOL EasyAvatar_GetFileFromClipboard(uint64 serverConnectionHandlerID)
 	if (!OpenClipboard(NULL))
 		return FALSE;
 
+	UINT format = EnumClipboardFormats(0);
+
 	// Never works
-	if (!IsClipboardFormatAvailable(CF_DIBV5))
+	if (!IsClipboardFormatAvailable(CF_BITMAP))
 	{
 		CloseClipboard();
 		return FALSE;
 	}
 
-	HGLOBAL hGlobalMem = GetClipboardData(CF_DIBV5);
+	HGLOBAL hGlobalMem = GetClipboardData(CF_BITMAP);
 	BITMAPINFO* bitMapInfo = (BITMAPINFO*)GlobalLock(hGlobalMem);
 
 	GlobalUnlock(hGlobalMem);
