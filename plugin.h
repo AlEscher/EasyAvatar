@@ -155,37 +155,45 @@ PLUGINS_EXPORTDLL const char* ts3plugin_keyPrefix();
 /* Functions */
 
 /*
-	Uploads an image to the server, aswell as setting all necessary parameters for it to be registered as the user's Avatar
+	Main function. Gets the URL from our clipboard and downloads the image to our plugin's directory.
+	Performs some necessary hashing and passes all the data including the avatar image to the server.
+	Returns true if everything went as expected, false otherwise.
 */
-int EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID);
+BOOL EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID);
 /*
 	Deletes your avatar in case something went wrong while setting it.
 */
-int EasyAvatar_DeleteAvatar(uint64 serverConnectionHandlerID);
+BOOL EasyAvatar_DeleteAvatar(uint64 serverConnectionHandlerID);
 
 /*
-	Create a directory for our plugin inside of plugins
+	Called once on initialization.
+	Creates a directory for our plugin inside of %appdata%/TS3Client/plugins
 */
-int EasyAvatar_CreateDirectory();
+BOOL EasyAvatar_CreateDirectory();
 
+/*
+	Returns a heap allocated string of the base64 encoded version of data.
+	Returns NULL if anything fails.
+*/
 char* EasyAvatar_b64encode(const unsigned char* data, size_t input_length, size_t output_length);
 
 /*	
-	Retrieve the data stored in the user's clipboard, return a heap allocated string. 
-	Returns NULL if anything fails
+	Retrieves the data stored in the user's clipboard, returns a heap allocated string. 
+	Returns NULL if anything fails.
 */
 char* EasyAvatar_GetLinkFromClipboard(uint64 serverConnectionHandlerID);
 int EasyAvatar_GetFileFromClipboard(uint64 serverConnectionHandlerID);
 
 /*
-	Returns a heap allocated MD5 Hash of the given file
+	Returns a heap allocated MD5 Hash of the given file.
+	Returns NULL if anything fails.
 */
 char* EasyAvatar_CreateMD5Hash(const char* filePath, uint64 serverConnectionHandlerID);
 
 /*
-	Resize our avatar file on disk
+	Resizes our avatar file on disk before we upload it to the server
 */
-int EasyAvatar_ResizeAvatar();
+BOOL EasyAvatar_ResizeAvatar();
 
 
 /* Other stuff */

@@ -671,6 +671,12 @@ void ts3plugin_onServerTemporaryPasswordListEvent(uint64 serverConnectionHandler
 void ts3plugin_onAvatarUpdated(uint64 serverConnectionHandlerID, anyID clientID, const char* avatarPath) {
 	/* If avatarPath is NULL, the avatar got deleted */
 	/* If not NULL, avatarPath contains the path to the avatar file in the TS3Client cache */
+
+	// Delete the avatar file locally. If we didn't set the avatar through our plugin
+	// this function will fail but we don't need to worry about that, 
+	// although onAvatarUpdated doesn't get called if we update our avatar manually.
+	// We delete here because at this point teamspeak won't have any more handles open to our local file
+	DeleteFileA(EASYAVATAR_IMAGEPATH);
 }
 
 /*
@@ -692,7 +698,6 @@ void ts3plugin_onMenuItemEvent(uint64 serverConnectionHandlerID, enum PluginMenu
 		{
 			EasyAvatar_DeleteAvatar(serverConnectionHandlerID);
 		}
-		
 	}
 }
 
@@ -742,7 +747,7 @@ void ts3plugin_onClientDisplayNameChanged(uint64 serverConnectionHandlerID, anyI
 
 /* My functions */
 
-int EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID)
+BOOL EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID)
 {
 	ts3Functions.logMessage("Called EasyAvatar_SetAvatar", LogLevel_DEBUG, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
 
@@ -751,7 +756,7 @@ int EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID)
 	if (ts3Functions.getClientID(serverConnectionHandlerID, &myID) != ERROR_ok)
 	{
 		ts3Functions.logMessage("Error querying own client id", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
-		return 0;
+		return FALSE;
 	}
 
 	anyID transferID;
@@ -770,7 +775,7 @@ int EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID)
 	if (!clientIDHash)
 	{
 		ts3Functions.logMessage("Failed to create base64 hash of clientID", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
-		return 0;
+		return FALSE;
 	}
 
 	char fileName[128];
@@ -784,7 +789,7 @@ int EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID)
 		// EasyAvatar_GetFileFromClipboard(serverConnectionHandlerID);
 		ts3Functions.logMessage("Failed to get Image URL from Clipboard", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
 		ts3Functions.freeMemory(clientIDHash);
-		return 0;
+		return FALSE;
 	}
 	
 
@@ -796,11 +801,12 @@ int EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID)
 		ts3Functions.logMessage("Download of image failed", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
 		ts3Functions.freeMemory(imageURL);
 		ts3Functions.freeMemory(clientIDHash);
-		return 0;
+		return FALSE;
 	}
 
 	ts3Functions.freeMemory(imageURL);
 
+	// Failure in this function isn't fatal, we still have a valid image
 	EasyAvatar_ResizeAvatar();
 
 	md5Hash = EasyAvatar_CreateMD5Hash(EASYAVATAR_IMAGEPATH, serverConnectionHandlerID);
@@ -808,7 +814,7 @@ int EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID)
 	{
 		ts3Functions.logMessage("Failed to create MD5 hash of file contents", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
 		ts3Functions.freeMemory(clientIDHash);
-		return 0;
+		return FALSE;
 	}
 
 	// Upload the image to the virtual servers internal file repository (channel with ID 0)
@@ -818,7 +824,7 @@ int EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID)
 		ts3Functions.logMessage("Failed to upload file.", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
 		ts3Functions.freeMemory(clientIDHash);
 		ts3Functions.freeMemory(md5Hash);
-		return 0;
+		return FALSE;
 	}
 
 	char msg[1024];
@@ -831,7 +837,7 @@ int EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID)
 		ts3Functions.logMessage("Failed to set CLIENT_FLAG_AVATAR", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
 		ts3Functions.freeMemory(clientIDHash);
 		ts3Functions.freeMemory(md5Hash);
-		return 0;
+		return FALSE;
 	}
 
 	// Flush all changes to the server
@@ -840,7 +846,7 @@ int EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID)
 		ts3Functions.logMessage("Failed to flush changes", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
 		ts3Functions.freeMemory(clientIDHash);
 		ts3Functions.freeMemory(md5Hash);
-		return 0;
+		return FALSE;
 	}
 
 	ts3Functions.freeMemory(clientIDHash);
@@ -848,10 +854,10 @@ int EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID)
 	ts3Functions.logMessage("Avatar set successfully!", LogLevel_INFO, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
 
 	// Return true if everything worked as expected
-	return 1;
+	return TRUE;
 }
 
-int EasyAvatar_DeleteAvatar(uint64 serverConnectionHandlerID)
+BOOL EasyAvatar_DeleteAvatar(uint64 serverConnectionHandlerID)
 {
 	ts3Functions.logMessage("Something went wrong, deleting avatar", LogLevel_INFO, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
 
@@ -859,21 +865,21 @@ int EasyAvatar_DeleteAvatar(uint64 serverConnectionHandlerID)
 	if (ts3Functions.setClientSelfVariableAsString(serverConnectionHandlerID, CLIENT_FLAG_AVATAR, "") != ERROR_ok)
 	{
 		ts3Functions.logMessage("Failed to set CLIENT_FLAG_AVATAR while deleting Avatar", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
-		return 0;
+		return FALSE;
 	}
 
 	// Flush all changes to the server
 	if (ts3Functions.flushClientSelfUpdates(serverConnectionHandlerID, NULL) != ERROR_ok)
 	{
 		ts3Functions.logMessage("Failed to flush changes while deleting Avatar", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
-		return 0;
+		return FALSE;
 	}
 
-	return 1;
+	return TRUE;
 }
 
 // If anything in this function fails, the plugin will be unloaded
-int EasyAvatar_CreateDirectory()
+BOOL EasyAvatar_CreateDirectory()
 {
 	char currentDirectory[PATH_BUFSIZE];
 	char pluginDirectory[PATH_BUFSIZE];
@@ -890,7 +896,7 @@ int EasyAvatar_CreateDirectory()
 		{
 			// CreateDirectory failed for another reason, abort
 			ts3Functions.logMessage("Failed to create plugin directory!", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, 0);
-			return 0;
+			return FALSE;
 		}
 		else
 		{
@@ -905,7 +911,7 @@ int EasyAvatar_CreateDirectory()
 	// Copy the path to the directory we just created into a global buffer
 	_strcpy(EASYAVATAR_FILEPATH, PATH_BUFSIZE, pluginDirectory);
 
-	return 1;
+	return TRUE;
 }
 
 char* EasyAvatar_GetLinkFromClipboard(uint64 serverConnectionHandlerID)
@@ -958,16 +964,16 @@ char* EasyAvatar_GetLinkFromClipboard(uint64 serverConnectionHandlerID)
 	}
 }
 
-int EasyAvatar_GetFileFromClipboard(uint64 serverConnectionHandlerID)
+BOOL EasyAvatar_GetFileFromClipboard(uint64 serverConnectionHandlerID)
 {
 	if (!OpenClipboard(NULL))
-		return 0;
+		return FALSE;
 
 	// Never works
 	if (!IsClipboardFormatAvailable(CF_DIBV5))
 	{
 		CloseClipboard();
-		return 0;
+		return FALSE;
 	}
 
 	HGLOBAL hGlobalMem = GetClipboardData(CF_DIBV5);
@@ -975,7 +981,7 @@ int EasyAvatar_GetFileFromClipboard(uint64 serverConnectionHandlerID)
 
 	GlobalUnlock(hGlobalMem);
 	CloseClipboard();
-	return 1;
+	return TRUE;
 
 
 }
@@ -1123,14 +1129,14 @@ char* EasyAvatar_CreateMD5Hash(const char* filePath, uint64 serverConnectionHand
 	return imageMD5Hash;
 }
 
-int EasyAvatar_ResizeAvatar()
+BOOL EasyAvatar_ResizeAvatar()
 {
 	// Dynamically get the image type (.png, .jpg, etc...)
 	FREE_IMAGE_FORMAT imgFormat = FreeImage_GetFileType(EASYAVATAR_IMAGEPATH, 0);
 	FIBITMAP* avatarImage = FreeImage_Load(imgFormat, EASYAVATAR_IMAGEPATH, 0);
 	if (!avatarImage)
 	{
-		return 0;
+		return FALSE;
 	}
 
 	unsigned int originalH = FreeImage_GetHeight(avatarImage);
@@ -1149,7 +1155,7 @@ int EasyAvatar_ResizeAvatar()
 	if (!resizedImage)
 	{
 		FreeImage_Unload(avatarImage);
-		return 0;
+		return FALSE;
 	}
 
 	// FreeImage_Save overwriting old avatar file
@@ -1158,5 +1164,5 @@ int EasyAvatar_ResizeAvatar()
 	FreeImage_Unload(avatarImage);
 	FreeImage_Unload(resizedImage);
 
-	return 1;
+	return TRUE;
 }
