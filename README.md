@@ -7,8 +7,8 @@ With this plugin you can easily set your avatar to any image from an URL.
 
 ### Installation
 
-1. Press ⊞ Win + R
-2. Type %appdata% and press Enter
+1. Press `⊞ Win` + `R`
+2. Type `%appdata%` and press `↵Enter`
 3. In the folder that opens, navigate to `TS3Client` -> `plugins`
 4. Copy EasyAvatar.dll into the folder
 5. Start TeamSpeak 3
