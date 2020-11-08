@@ -1,5 +1,5 @@
 # EasyAvatar
-[![Release](https://img.shields.io/github/v/release/AlEscher/EasyAvatar?color=brightgreen&label=Download&style=plastic)](https://github.com/AlEscher/EasyAvatar/releases/download/v1.1/EasyAvatar.dll)
+[![Release](https://img.shields.io/github/v/release/AlEscher/EasyAvatar?color=brightgreen&label=Download&style=plastic)](https://github.com/AlEscher/EasyAvatar/releases/latest/download/EasyAvatar.dll)
 [![GitHub](https://img.shields.io/github/license/AlEscher/EasyAvatar?color=blue&style=plastic)](https://github.com/AlEscher/EasyAvatar/blob/master/LICENSE)
 
 A TeamSpeak 3 plugin written in C.  
