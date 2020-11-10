@@ -191,9 +191,10 @@ int EasyAvatar_GetFileFromClipboard(uint64 serverConnectionHandlerID);
 char* EasyAvatar_CreateMD5Hash(const char* filePath, uint64 serverConnectionHandlerID);
 
 /*
-	Resizes our avatar file on disk before we upload it to the server
+	Resizes our avatar file on disk before we upload it to the server.
+	Will only fail if the file isn't an image
 */
-BOOL EasyAvatar_ResizeAvatar();
+BOOL EasyAvatar_ResizeAvatar(uint64 serverConnectionHandlerID);
 
 
 /* Other stuff */

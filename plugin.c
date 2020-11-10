@@ -39,7 +39,7 @@ static struct TS3Functions ts3Functions;
 #define _strcpy(dest, destSize, src) { strncpy(dest, src, destSize-1); (dest)[destSize-1] = '\0'; }
 #endif
 
-#define PLUGIN_API_VERSION 23
+#define PLUGIN_API_VERSION 24
 
 #define COMMAND_BUFSIZE 128
 #define INFODATA_BUFSIZE 128
@@ -86,7 +86,7 @@ const char* ts3plugin_name() {
 
 /* Plugin version */
 const char* ts3plugin_version() {
-	return "1.0";
+	return "1.1";
 }
 
 /* Plugin API version. Must be the same as the clients API major version, else the plugin fails to load. */
@@ -787,8 +787,12 @@ BOOL EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID)
 
 	ts3Functions.freeMemory(imageURL);
 
-	// Failure in this function isn't fatal, we still have a valid image
-	EasyAvatar_ResizeAvatar();
+	// Failure in this function means the file isn't an image
+	// If this function returns true it doesn't indicate that we successfully resized
+	if (!EasyAvatar_ResizeAvatar(serverConnectionHandlerID))
+	{
+		return FALSE;
+	}
 
 	md5Hash = EasyAvatar_CreateMD5Hash(EASYAVATAR_IMAGEPATH, serverConnectionHandlerID);
 	if (!md5Hash)
@@ -1104,14 +1108,25 @@ char* EasyAvatar_CreateMD5Hash(const char* filePath, uint64 serverConnectionHand
 	return imageMD5Hash;
 }
 
-BOOL EasyAvatar_ResizeAvatar()
+BOOL EasyAvatar_ResizeAvatar(uint64 serverConnectionHandlerID)
 {
 	// Dynamically get the image type (png, jpg, etc...)
 	FREE_IMAGE_FORMAT imgFormat = FreeImage_GetFileType(EASYAVATAR_IMAGEPATH, 0);
+	if (imgFormat == FIF_UNKNOWN)
+	{
+		ts3Functions.logMessage("Tried loading unknown image format", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
+		return FALSE;
+	}
+
+	// Skip resizing GIFs for now as they break while Saving
+	if (imgFormat == FIF_GIF)
+		return TRUE;
+
 	FIBITMAP* avatarImage = FreeImage_Load(imgFormat, EASYAVATAR_IMAGEPATH, 0);
 	if (!avatarImage)
 	{
-		return FALSE;
+		// At this point we know the file is an image, only the resize process failed which isn't fatal
+		return TRUE;
 	}
 
 	unsigned int originalH = FreeImage_GetHeight(avatarImage);
@@ -1136,7 +1151,7 @@ BOOL EasyAvatar_ResizeAvatar()
 	if (!resizedImage)
 	{
 		FreeImage_Unload(avatarImage);
-		return FALSE;
+		return TRUE;
 	}
 
 	// FreeImage_Save overwriting old avatar file
