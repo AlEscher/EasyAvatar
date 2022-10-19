@@ -77,7 +77,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;TEST_PLUGIN_EXPORTS;WINDOWS;WIN32_LEAN_AND_MEAN;NOFMOD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <PrecompiledHeader />
@@ -119,7 +119,7 @@
       <PrecompiledHeader />
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <AdditionalIncludeDirectories>..\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -135,7 +135,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>None</DebugInformationFormat>
-      <AdditionalIncludeDirectories>..\include;C:\Users\Ale\Downloads\pluginsdk_3.1.1.1\pluginsdk\src\FreeImage;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>./FreeImage;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FavorSizeOrSpeed>Size</FavorSizeOrSpeed>
       <Optimization>MinSpace</Optimization>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -145,8 +145,8 @@
       <SubSystem>Windows</SubSystem>
       <DataExecutionPrevention>
       </DataExecutionPrevention>
-      <AdditionalLibraryDirectories>C:\Users\Ale\Downloads\pluginsdk_3.1.1.1\pluginsdk\src\FreeImage;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>FreeImageLib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>./FreeImage;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>FreeImage.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
       <OptimizeReferences>true</OptimizeReferences>
@@ -160,14 +160,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="FreeImage\FreeImage.h" />
-    <ClInclude Include="include\teamlog\logtypes.h" />
-    <ClInclude Include="include\teamspeak\clientlib.h" />
-    <ClInclude Include="include\teamspeak\clientlib_publicdefinitions.h" />
-    <ClInclude Include="include\teamspeak\public_definitions.h" />
-    <ClInclude Include="include\teamspeak\public_errors.h" />
-    <ClInclude Include="include\teamspeak\serverlib.h" />
-    <ClInclude Include="include\teamspeak\serverlib_publicdefinitions.h" />
-    <ClInclude Include="include\teamspeak\server_commands_file_transfer.h" />
     <ClInclude Include="plugin.h" />
     <ClInclude Include="TeamSpeakSDK\plugin_definitions.h" />
     <ClInclude Include="TeamSpeakSDK\teamlog\logtypes.h" />
