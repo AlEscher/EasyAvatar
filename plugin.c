@@ -10,7 +10,7 @@
 #endif
 
 #pragma comment(lib, "Urlmon.lib")
-#pragma comment(lib, "FreeImageLib.lib")
+#pragma comment(lib, "FreeImage.lib")
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,12 +18,12 @@
 #include <assert.h>
 #include <Wincrypt.h>
 #include <urlmon.h>
-#include "teamspeak/public_errors.h"
-#include "teamspeak/public_errors_rare.h"
-#include "teamspeak/public_definitions.h"
-#include "teamspeak/public_rare_definitions.h"
-#include "teamspeak/clientlib_publicdefinitions.h"
-#include "ts3_functions.h"
+#include "TeamSpeakSDK/teamspeak/public_errors.h"
+#include "TeamSpeakSDK/teamspeak/public_errors_rare.h"
+#include "TeamSpeakSDK/teamspeak/public_definitions.h"
+#include "TeamSpeakSDK/teamspeak/public_rare_definitions.h"
+#include "TeamSpeakSDK/teamspeak/clientlib_publicdefinitions.h"
+#include "TeamSpeakSDK/ts3_functions.h"
 #include "plugin.h"
 
 #include "FreeImage/FreeImage.h"

@@ -94,7 +94,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\include;C:\Users\Ale\Downloads\pluginsdk_3.1.1.1\pluginsdk\src\FreeImage;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>./FreeImage;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;TEST_PLUGIN_EXPORTS;WINDOWS;WIN32_LEAN_AND_MEAN;NOFMOD;FREEIMAGE_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <PrecompiledHeader>
@@ -107,8 +107,8 @@
       <SubSystem>Windows</SubSystem>
       <DataExecutionPrevention>
       </DataExecutionPrevention>
-      <AdditionalLibraryDirectories>C:\Users\Ale\Downloads\pluginsdk_3.1.1.1\pluginsdk\src\FreeImage;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>FreeImageLib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>./FreeImage;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>FreeImage.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>LIBCMT;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
@@ -159,15 +159,24 @@
     <ClCompile Include="plugin.c" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\include\plugin_definitions.h" />
-    <ClInclude Include="..\include\teamlog\logtypes.h" />
-    <ClInclude Include="..\include\teamspeak\clientlib_publicdefinitions.h" />
-    <ClInclude Include="..\include\teamspeak\public_definitions.h" />
-    <ClInclude Include="..\include\teamspeak\public_errors.h" />
-    <ClInclude Include="..\include\teamspeak\public_errors_rare.h" />
-    <ClInclude Include="..\include\teamspeak\public_rare_definitions.h" />
-    <ClInclude Include="..\include\ts3_functions.h" />
+    <ClInclude Include="FreeImage\FreeImage.h" />
+    <ClInclude Include="include\teamlog\logtypes.h" />
+    <ClInclude Include="include\teamspeak\clientlib.h" />
+    <ClInclude Include="include\teamspeak\clientlib_publicdefinitions.h" />
+    <ClInclude Include="include\teamspeak\public_definitions.h" />
+    <ClInclude Include="include\teamspeak\public_errors.h" />
+    <ClInclude Include="include\teamspeak\serverlib.h" />
+    <ClInclude Include="include\teamspeak\serverlib_publicdefinitions.h" />
+    <ClInclude Include="include\teamspeak\server_commands_file_transfer.h" />
     <ClInclude Include="plugin.h" />
+    <ClInclude Include="TeamSpeakSDK\plugin_definitions.h" />
+    <ClInclude Include="TeamSpeakSDK\teamlog\logtypes.h" />
+    <ClInclude Include="TeamSpeakSDK\teamspeak\clientlib_publicdefinitions.h" />
+    <ClInclude Include="TeamSpeakSDK\teamspeak\public_definitions.h" />
+    <ClInclude Include="TeamSpeakSDK\teamspeak\public_errors.h" />
+    <ClInclude Include="TeamSpeakSDK\teamspeak\public_errors_rare.h" />
+    <ClInclude Include="TeamSpeakSDK\teamspeak\public_rare_definitions.h" />
+    <ClInclude Include="TeamSpeakSDK\ts3_functions.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

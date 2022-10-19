@@ -25,28 +25,55 @@
     <ClInclude Include="plugin.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\ts3_functions.h">
+    <ClInclude Include="include\teamspeak\clientlib.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\teamspeak\clientlib_publicdefinitions.h">
-      <Filter>Header Files\teamspeak</Filter>
+    <ClInclude Include="include\teamspeak\clientlib_publicdefinitions.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\teamspeak\public_definitions.h">
-      <Filter>Header Files\teamspeak</Filter>
+    <ClInclude Include="include\teamspeak\public_definitions.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\teamspeak\public_errors.h">
-      <Filter>Header Files\teamspeak</Filter>
+    <ClInclude Include="include\teamspeak\public_errors.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\teamspeak\public_errors_rare.h">
-      <Filter>Header Files\teamspeak</Filter>
+    <ClInclude Include="include\teamspeak\server_commands_file_transfer.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\teamspeak\public_rare_definitions.h">
-      <Filter>Header Files\teamspeak</Filter>
+    <ClInclude Include="include\teamspeak\serverlib.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\teamlog\logtypes.h">
-      <Filter>Header Files\teamlog</Filter>
+    <ClInclude Include="include\teamspeak\serverlib_publicdefinitions.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\plugin_definitions.h">
+    <ClInclude Include="include\teamlog\logtypes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TeamSpeakSDK\teamlog\logtypes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TeamSpeakSDK\teamspeak\clientlib_publicdefinitions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TeamSpeakSDK\teamspeak\public_definitions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TeamSpeakSDK\teamspeak\public_errors.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TeamSpeakSDK\teamspeak\public_errors_rare.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TeamSpeakSDK\teamspeak\public_rare_definitions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TeamSpeakSDK\plugin_definitions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TeamSpeakSDK\ts3_functions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="FreeImage\FreeImage.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
