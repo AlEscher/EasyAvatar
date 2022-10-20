@@ -16,7 +16,8 @@ With this plugin you can easily set your avatar to any image from an URL.
 
 ## Usage
 
-The URL you provide should point directly to an image, i.e. it should end with e.g. `.png` or `.jpeg`.
+The URL you provide should point directly to an image, i.e. it should end with e.g. `.png` or `.jpeg`.  
+You can get it by right clicking on any image in your browser and selecting "Copy Image **Link**"
 
 ### Using a Hotkey
 
@@ -35,4 +36,4 @@ When connected to a server, Right Click on yourself and at the bottom under `Eas
 
 ## Dependencies
 
-I am using [FreeImage](http://freeimage.sourceforge.net) for image operations such as resizing
+I am using [FreeImage 3.18](http://freeimage.sourceforge.net) for image operations such as resizing
