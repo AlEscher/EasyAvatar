@@ -37,7 +37,7 @@ BYTE* EasyAvatar_b64decode(const char* data, size_t input_length, size_t* output
 */
 char* EasyAvatar_GetStringFromClipboard(uint64 serverConnectionHandlerID, struct TS3Functions* ts3Functions);
 
-BOOL EasyAvatar_HandleClipboardContent(char* clipboardData, char* fileName, uint64 serverConnectionHandlerID, struct TS3Functions* ts3Functions);
+BOOL EasyAvatar_HandleClipboardContent(char* clipboardData, uint64 serverConnectionHandlerID, struct TS3Functions* ts3Functions);
 
 int EasyAvatar_GetFileFromClipboard(uint64 serverConnectionHandlerID);
 

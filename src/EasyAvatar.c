@@ -59,7 +59,7 @@ BOOL EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID, struct TS3Functions*
 
 	snprintf(EASYAVATAR_IMAGEPATH, sizeof(EASYAVATAR_IMAGEPATH), "%s\\%s", EASYAVATAR_FILEPATH, fileName);
 
-	if (!EasyAvatar_HandleClipboardContent(clipboardData, EASYAVATAR_IMAGEPATH, serverConnectionHandlerID, ts3Functions))
+	if (!EasyAvatar_HandleClipboardContent(clipboardData, serverConnectionHandlerID, ts3Functions))
 	{
 		ts3Functions->freeMemory(clipboardData);
 		return FALSE;
@@ -222,7 +222,7 @@ char* EasyAvatar_GetStringFromClipboard(uint64 serverConnectionHandlerID, struct
 	}
 }
 
-BOOL EasyAvatar_HandleClipboardContent(char* clipboardData, char* fileName, uint64 serverConnectionHandlerID, struct TS3Functions* ts3Functions)
+BOOL EasyAvatar_HandleClipboardContent(char* clipboardData, uint64 serverConnectionHandlerID, struct TS3Functions* ts3Functions)
 {
 	if (strncmp(clipboardData, "data:image/", 11U) == 0 && strstr(clipboardData, "base64") != NULL)
 	{
@@ -246,7 +246,7 @@ BOOL EasyAvatar_HandleClipboardContent(char* clipboardData, char* fileName, uint
 		}
 
 		FILE* fp;
-		errno_t result = fopen_s(&fp, fileName, "wb");
+		errno_t result = fopen_s(&fp, EASYAVATAR_IMAGEPATH, "wb");
 		if (result != 0)
 		{
 			ts3Functions->logMessage("Failed to write decoded image to file", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
@@ -262,6 +262,22 @@ BOOL EasyAvatar_HandleClipboardContent(char* clipboardData, char* fileName, uint
 		if (downloadRes != S_OK)
 		{
 			ts3Functions->logMessage("Download of image failed", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
+			return FALSE;
+		}
+	}
+
+	// Teamspeak only accepts avatars under 200KB
+	FILE* fp;
+	errno_t result = fopen_s(&fp, EASYAVATAR_IMAGEPATH, "rb");
+	if (fp)
+	{
+		fseek(fp, 0L, SEEK_END);
+		size_t fileSize = ftell(fp);
+		fclose(fp);
+
+		if (fileSize > 200000)
+		{
+			ts3Functions->logMessage("Image is too large (> 200KB)", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
 			return FALSE;
 		}
 	}
