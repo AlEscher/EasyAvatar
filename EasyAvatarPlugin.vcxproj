@@ -108,7 +108,7 @@
       <DataExecutionPrevention>
       </DataExecutionPrevention>
       <AdditionalLibraryDirectories>./FreeImage;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>FreeImage.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>FreeImageLibd.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>LIBCMT;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
@@ -146,8 +146,8 @@
       <DataExecutionPrevention>
       </DataExecutionPrevention>
       <AdditionalLibraryDirectories>./FreeImage;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>FreeImage.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <AdditionalDependencies>FreeImageLib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <IgnoreSpecificDefaultLibraries>LIBCMT;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>false</EnableCOMDATFolding>
@@ -156,11 +156,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="plugin.c" />
+    <ClCompile Include="src\EasyAvatar.c" />
+    <ClCompile Include="src\plugin.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="FreeImage\FreeImage.h" />
-    <ClInclude Include="plugin.h" />
+    <ClInclude Include="src\EasyAvatar.h" />
+    <ClInclude Include="src\plugin.h" />
     <ClInclude Include="TeamSpeakSDK\plugin_definitions.h" />
     <ClInclude Include="TeamSpeakSDK\teamlog\logtypes.h" />
     <ClInclude Include="TeamSpeakSDK\teamspeak\clientlib_publicdefinitions.h" />
@@ -169,6 +171,9 @@
     <ClInclude Include="TeamSpeakSDK\teamspeak\public_errors_rare.h" />
     <ClInclude Include="TeamSpeakSDK\teamspeak\public_rare_definitions.h" />
     <ClInclude Include="TeamSpeakSDK\ts3_functions.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="FreeImage\FreeImageLib.lib" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
