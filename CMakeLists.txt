@@ -116,7 +116,8 @@ set(PROJECT_NAME EasyAvatar)
 ################################################################################
 set(Header_Files
     "FreeImage/FreeImage.h"
-    "plugin.h"
+    "src/EasyAvatar.h"
+    "src/plugin.h"
     "TeamSpeakSDK/plugin_definitions.h"
     "TeamSpeakSDK/teamlog/logtypes.h"
     "TeamSpeakSDK/teamspeak/clientlib_publicdefinitions.h"
@@ -129,7 +130,8 @@ set(Header_Files
 source_group("Header Files" FILES ${Header_Files})
 
 set(Source_Files
-    "plugin.c"
+    "src/EasyAvatar.c"
+    "src/plugin.c"
 )
 source_group("Source Files" FILES ${Source_Files})
 
@@ -281,7 +283,6 @@ if(MSVC)
     elseif("${CMAKE_VS_PLATFORM_NAME}" STREQUAL "x64")
         target_link_options(${PROJECT_NAME} PRIVATE
             $<$<CONFIG:Debug>:
-                /NODEFAULTLIB:LIBCMT;
                 /DEBUG
             >
             $<$<CONFIG:Release>:
@@ -289,6 +290,7 @@ if(MSVC)
                 /OPT:REF;
                 /OPT:NOICF
             >
+            /NODEFAULTLIB:LIBCMT;
             /SUBSYSTEM:WINDOWS
         )
     endif()
@@ -299,7 +301,12 @@ endif()
 ################################################################################
 if("${CMAKE_VS_PLATFORM_NAME}" STREQUAL "x64")
     set(ADDITIONAL_LIBRARY_DEPENDENCIES
-        "FreeImage"
+        "$<$<CONFIG:Debug>:"
+            "FreeImageLibd"
+        ">"
+        "$<$<CONFIG:Release>:"
+            "FreeImageLib"
+        ">"
     )
 endif()
 target_link_libraries(${PROJECT_NAME} PUBLIC "${ADDITIONAL_LIBRARY_DEPENDENCIES}")
