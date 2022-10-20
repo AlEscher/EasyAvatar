@@ -36,7 +36,7 @@ BOOL EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID, struct TS3Functions*
 	snprintf(clientID, sizeof(clientID), "%hu=", myID);
 	size_t clientIDHashLen = strnlen_s(clientID, sizeof(clientID));
 
-	clientIDHash = EasyAvatar_b64encode(clientID, clientIDHashLen, clientIDHashLen);
+	clientIDHash = EasyAvatar_b64encode(clientID, clientIDHashLen);
 	if (!clientIDHash)
 	{
 		ts3Functions->logMessage("Failed to create base64 hash of clientID", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
@@ -48,8 +48,8 @@ BOOL EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID, struct TS3Functions*
 	ts3Functions->freeMemory(clientIDHash);
 
 	// Get image URL from Clipboard, if that fails try to see if a file is copied
-	char* imageURL = EasyAvatar_GetLinkFromClipboard(serverConnectionHandlerID, ts3Functions);
-	if (!imageURL)
+	char* clipboardData = EasyAvatar_GetStringFromClipboard(serverConnectionHandlerID, ts3Functions);
+	if (!clipboardData)
 	{
 		// Try to get a file from clipboard
 		// EasyAvatar_GetFileFromClipboard(serverConnectionHandlerID);
@@ -59,15 +59,13 @@ BOOL EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID, struct TS3Functions*
 
 	snprintf(EASYAVATAR_IMAGEPATH, sizeof(EASYAVATAR_IMAGEPATH), "%s\\%s", EASYAVATAR_FILEPATH, fileName);
 
-	HRESULT downloadRes = URLDownloadToFileA(NULL, imageURL, EASYAVATAR_IMAGEPATH, 0, NULL);
-	if (downloadRes != S_OK)
+	if (!EasyAvatar_HandleClipboardContent(clipboardData, EASYAVATAR_IMAGEPATH, serverConnectionHandlerID, ts3Functions))
 	{
-		ts3Functions->logMessage("Download of image failed", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
-		ts3Functions->freeMemory(imageURL);
+		ts3Functions->freeMemory(clipboardData);
 		return FALSE;
 	}
-
-	ts3Functions->freeMemory(imageURL);
+	
+	ts3Functions->freeMemory(clipboardData);
 
 	// Failure in this function means the file isn't an image
 	// If this function returns true it doesn't indicate that we successfully resized
@@ -173,7 +171,7 @@ BOOL EasyAvatar_CreateDirectory(struct TS3Functions* ts3Functions, char* pluginI
 	return TRUE;
 }
 
-char* EasyAvatar_GetLinkFromClipboard(uint64 serverConnectionHandlerID, struct TS3Functions* ts3Functions)
+char* EasyAvatar_GetStringFromClipboard(uint64 serverConnectionHandlerID, struct TS3Functions* ts3Functions)
 {
 	if (!OpenClipboard(NULL))
 		return NULL;
@@ -186,8 +184,9 @@ char* EasyAvatar_GetLinkFromClipboard(uint64 serverConnectionHandlerID, struct T
 
 	// Allocate a global memory object for the text. +1 for null termination
 	HGLOBAL hGlobalMem = GetClipboardData(CF_TEXT);
+	// This can be an URL to an image or the whole image encoded as base64
 	const char* clipboardStr = (const char*)(GlobalLock(hGlobalMem));
-	size_t clipBoardDataLength = strnlen_s(clipboardStr, 2048) + 1;
+	size_t clipBoardDataLength = strnlen_s(clipboardStr, INT_MAX) + 1;
 	// Check that the clipboard wasn't empty
 	if (!hGlobalMem || !clipboardStr || !clipBoardDataLength)
 	{
@@ -223,6 +222,53 @@ char* EasyAvatar_GetLinkFromClipboard(uint64 serverConnectionHandlerID, struct T
 	}
 }
 
+BOOL EasyAvatar_HandleClipboardContent(char* clipboardData, char* fileName, uint64 serverConnectionHandlerID, struct TS3Functions* ts3Functions)
+{
+	if (strncmp(clipboardData, "data:image/", 11U) == 0 && strstr(clipboardData, "base64") != NULL)
+	{
+		// Clipboard data contains a base64 encoded image	
+		char* encodedImage = strstr(clipboardData, ",") + 1;
+		if (!encodedImage)
+		{
+			ts3Functions->logMessage("Could not parse base64 encoded image", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
+			return FALSE;
+		}
+		
+		size_t decodedLength = 0;
+		BYTE* decodedImage = EasyAvatar_b64decode(encodedImage, strlen(encodedImage), &decodedLength);
+		FIMEMORY* mem = FreeImage_OpenMemory(decodedImage, decodedLength);
+		FREE_IMAGE_FORMAT fif = FreeImage_GetFileTypeFromMemory(mem, 0);
+		FreeImage_CloseMemory(mem);
+		if (fif == FIF_UNKNOWN)
+		{
+			ts3Functions->logMessage("Invalid image from base64 decoding", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
+			return FALSE;
+		}
+
+		FILE* fp;
+		errno_t result = fopen_s(&fp, fileName, "wb");
+		if (result != 0)
+		{
+			ts3Functions->logMessage("Failed to write decoded image to file", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
+			return FALSE;
+		}
+
+		fwrite(decodedImage, 1, decodedLength, fp);
+		fclose(fp);
+		ts3Functions->freeMemory(decodedImage);
+	} else // Treat clipboard data as an URL
+	{
+		HRESULT downloadRes = URLDownloadToFileA(NULL, clipboardData, EASYAVATAR_IMAGEPATH, 0, NULL);
+		if (downloadRes != S_OK)
+		{
+			ts3Functions->logMessage("Download of image failed", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
+			return FALSE;
+		}
+	}
+	
+	return TRUE;
+}
+
 BOOL EasyAvatar_GetFileFromClipboard(uint64 serverConnectionHandlerID)
 {
 	if (!OpenClipboard(NULL))
@@ -249,11 +295,11 @@ BOOL EasyAvatar_GetFileFromClipboard(uint64 serverConnectionHandlerID)
 
 // Taken from https://stackoverflow.com/a/48818578
 
-char* EasyAvatar_b64encode(const unsigned char* data, size_t input_length, size_t output_length)
+char* EasyAvatar_b64encode(const unsigned char* data, size_t input_length)
 {
 	const int mod_table[] = { 0, 2, 1 };
 
-	output_length = 4 * ((input_length + 2) / 3);
+	size_t output_length = 4 * ((input_length + 2) / 3);
 
 	// One extra character for correct null termination
 	char* encoded_data = (char*)malloc(output_length + 1);
@@ -284,7 +330,45 @@ char* EasyAvatar_b64encode(const unsigned char* data, size_t input_length, size_
 
 
 	return encoded_data;
-};
+}
+
+BYTE* EasyAvatar_b64decode(const char* data, size_t input_length, size_t* output_length)
+{
+
+	if (input_length % 4 != 0)
+		return NULL;
+
+	*output_length = input_length / 4 * 3;
+
+	if (data[input_length - 1] == '=') (*output_length)--;
+	if (data[input_length - 2] == '=') (*output_length)--;
+
+	unsigned char* decoded_data = (unsigned char*)malloc(*output_length);
+
+	if (decoded_data == NULL)
+		return NULL;
+
+	for (int i = 0, j = 0; i < input_length;) {
+
+		unsigned int sextet_a = data[i] == '=' ? 0 & i++ : decoding_table[data[i++]];
+		unsigned int sextet_b = data[i] == '=' ? 0 & i++ : decoding_table[data[i++]];
+		unsigned int sextet_c = data[i] == '=' ? 0 & i++ : decoding_table[data[i++]];
+		unsigned int sextet_d = data[i] == '=' ? 0 & i++ : decoding_table[data[i++]];
+
+		unsigned int triple = (sextet_a << 3 * 6)
+			+ (sextet_b << 2 * 6)
+			+ (sextet_c << 1 * 6)
+			+ (sextet_d << 0 * 6);
+
+		if (j < *output_length) decoded_data[j++] = (triple >> 2 * 8) & 0xFF;
+		if (j < *output_length) decoded_data[j++] = (triple >> 1 * 8) & 0xFF;
+		if (j < *output_length) decoded_data[j++] = (triple >> 0 * 8) & 0xFF;
+
+	}
+
+	return decoded_data;
+
+}
 
 // As specified by https://docs.microsoft.com/en-us/windows/win32/seccrypto/example-c-program--creating-an-md-5-hash-from-file-content
 
@@ -312,7 +396,7 @@ char* EasyAvatar_CreateMD5Hash(const char* filePath, uint64 serverConnectionHand
 	if (INVALID_HANDLE_VALUE == hFile)
 	{
 		char errorMessage[1024];
-		snprintf(errorMessage, sizeof(errorMessage), "Error openen file for hashing: Filepath: %s  Error Code: %d", filePath, GetLastError());
+		snprintf(errorMessage, sizeof(errorMessage), "Error opening file for hashing: Filepath: %s  Error Code: %d", filePath, GetLastError());
 		ts3Functions->logMessage(errorMessage, LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
 		return NULL;
 	}
@@ -380,7 +464,7 @@ char* EasyAvatar_CreateMD5Hash(const char* filePath, uint64 serverConnectionHand
 	}
 	else
 	{
-		// Nothing todo, imageMD5Hash will be NULL which will be handled by caller
+		// Nothing to do, imageMD5Hash will be NULL which will be handled by caller
 	}
 
 	CryptDestroyHash(hHash);
