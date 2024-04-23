@@ -674,6 +674,7 @@ void ts3plugin_onMenuItemEvent(uint64 serverConnectionHandlerID, enum PluginMenu
 {
 	if (type == PLUGIN_MENU_TYPE_CLIENT && menuItemID == MENU_ID_CLIENT_1)
 	{
+		ts3Functions.logMessage("Context Menu Callback", LogLevel_DEBUG, EASYAVATAR_LOGCHANNEL, ts3Functions.getCurrentServerConnectionHandlerID());
 		// If we fail setting the avatar, your Avatar becomse a 404 red image
 		// and subsequent attempts at setting a new image may have no effects, so we reset it
 		if (!EasyAvatar_SetAvatar(serverConnectionHandlerID, &ts3Functions))
@@ -688,6 +689,7 @@ void ts3plugin_onHotkeyEvent(const char* keyword)
 {
 	if (strncmp(keyword, "ez_set_avatar", 13) == 0)
 	{
+		ts3Functions.logMessage("Plugin Hotkey Callback", LogLevel_DEBUG, EASYAVATAR_LOGCHANNEL, ts3Functions.getCurrentServerConnectionHandlerID());
 		// If we fail setting the avatar, your Avatar becomse a 404 red image
 		// and subsequent attempts at setting a new image may have no effects, so we reset it
 		if (!EasyAvatar_SetAvatar(ts3Functions.getCurrentServerConnectionHandlerID(), &ts3Functions))

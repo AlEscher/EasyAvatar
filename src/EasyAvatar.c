@@ -14,6 +14,8 @@
 #define _strcpy(dest, destSize, src) { strncpy(dest, src, destSize-1); (dest)[destSize-1] = '\0'; }
 #endif
 
+char lastAvatarHash[MD5LEN * 2 + 1];
+
 BOOL EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID, struct TS3Functions* ts3Functions)
 {
 	// Uniquely identifies our client on the server
@@ -80,6 +82,17 @@ BOOL EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID, struct TS3Functions*
 		ts3Functions->logMessage("Failed to create MD5 hash of file contents", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
 		return FALSE;
 	}
+
+	const int hashLength = MD5LEN * 2 + 1;
+	// For some reason, when using a hotkey to set the avatar the callback gets called twice, so that the second execution fails as the file is already uploaded to the TS server
+	// Check that we are not trying to upload the same file as last time
+	if (strncmp(md5Hash, lastAvatarHash, hashLength) == 0)
+	{
+		ts3Functions->logMessage("Skipping duplicate avatar", LogLevel_INFO, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
+		ts3Functions->freeMemory(md5Hash);
+		return TRUE;
+	}
+	strncpy_s(lastAvatarHash, hashLength, md5Hash, hashLength-1);
 
 	// Upload the image to the virtual servers internal file repository (channel with ID 0)
 	// Apparently still returns ERROR_ok even if the path to the image is invalid
