@@ -53,6 +53,8 @@ char* EasyAvatar_CreateMD5Hash(const char* filePath, uint64 serverConnectionHand
 */
 BOOL EasyAvatar_ResizeAvatar(uint64 serverConnectionHandlerID, struct TS3Functions* ts3Functions);
 
+BOOL EasyAvatar_CheckFileSize(uint64 serverConnectionHandlerID, struct TS3Functions* ts3Functions);
+
 
 /* Other stuff */
 

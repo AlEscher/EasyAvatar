@@ -75,6 +75,11 @@ BOOL EasyAvatar_SetAvatar(uint64 serverConnectionHandlerID, struct TS3Functions*
 	{
 		return FALSE;
 	}
+	// Check file size after resizing
+	if (!EasyAvatar_CheckFileSize(serverConnectionHandlerID, ts3Functions))
+	{
+		return FALSE;
+	}
 
 	md5Hash = EasyAvatar_CreateMD5Hash(EASYAVATAR_IMAGEPATH, serverConnectionHandlerID, ts3Functions);
 	if (!md5Hash)
@@ -275,22 +280,6 @@ BOOL EasyAvatar_HandleClipboardContent(char* clipboardData, uint64 serverConnect
 		if (downloadRes != S_OK)
 		{
 			ts3Functions->logMessage("Download of image failed", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
-			return FALSE;
-		}
-	}
-
-	// Teamspeak only accepts avatars under 200KB
-	FILE* fp;
-	errno_t result = fopen_s(&fp, EASYAVATAR_IMAGEPATH, "rb");
-	if (fp)
-	{
-		fseek(fp, 0L, SEEK_END);
-		size_t fileSize = ftell(fp);
-		fclose(fp);
-
-		if (fileSize > 200000)
-		{
-			ts3Functions->logMessage("Image is too large (> 200KB)", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
 			return FALSE;
 		}
 	}
@@ -554,6 +543,27 @@ BOOL EasyAvatar_ResizeAvatar(uint64 serverConnectionHandlerID, struct TS3Functio
 
 	FreeImage_Unload(avatarImage);
 	FreeImage_Unload(resizedImage);
+
+	return TRUE;
+}
+
+BOOL EasyAvatar_CheckFileSize(uint64 serverConnectionHandlerID, struct TS3Functions* ts3Functions)
+{
+	// Teamspeak only accepts avatars under 200KB
+	FILE* fp;
+	errno_t result = fopen_s(&fp, EASYAVATAR_IMAGEPATH, "rb");
+	if (fp)
+	{
+		fseek(fp, 0L, SEEK_END);
+		size_t fileSize = ftell(fp);
+		fclose(fp);
+
+		if (fileSize > 200000)
+		{
+			ts3Functions->logMessage("Image is too large (> 200KB)", LogLevel_ERROR, EASYAVATAR_LOGCHANNEL, serverConnectionHandlerID);
+			return FALSE;
+		}
+	}
 
 	return TRUE;
 }
