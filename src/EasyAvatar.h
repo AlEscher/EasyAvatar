@@ -63,7 +63,7 @@ BOOL EasyAvatar_CheckFileSize(uint64 serverConnectionHandlerID, struct TS3Functi
 #define EASYAVATAR_DIR "easy_avatar"
 #define BUFSIZE 1024
 #define MD5LEN  16
-#define PLUGIN_VERSION "1.3"
+#define PLUGIN_VERSION "1.3.1"
 // Path to our plugin's directory
 char EASYAVATAR_FILEPATH[PATH_BUFSIZE];
 // Absolute file path to our image file
